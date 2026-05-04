@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ProviderApprovalActions } from "@/components/admin/provider-actions";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -143,10 +144,7 @@ export default async function AdminDashboard() {
                           {prof?.full_name} • {(p.categories as string[])?.join(", ")}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" className="h-7 text-xs">Approve</Button>
-                        <Button size="sm" variant="outline" className="h-7 text-xs border-white/20 text-white/60">Reject</Button>
-                      </div>
+                      <ProviderApprovalActions providerId={p.id as string} />
                     </div>
                   </Link>
                 );

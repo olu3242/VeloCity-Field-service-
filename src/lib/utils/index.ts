@@ -2,6 +2,16 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { JobStatus, ServiceCategory, UrgencyLevel } from "@/types";
 
+export {
+  getAvailableTransitions,
+  canTransition,
+  getJobProgressPercent,
+  TERMINAL_STATES,
+  ACTIVE_STATES,
+  CUSTOMER_ACTION_STATES,
+  PROVIDER_ACTION_STATES,
+} from "@/lib/workflows/job-state-machine";
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

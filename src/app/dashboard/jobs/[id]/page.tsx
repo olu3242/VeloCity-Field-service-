@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { QuoteActions } from "@/components/jobs/quote-actions";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -144,19 +145,7 @@ export default async function JobDetailPage({
                   </div>
 
                   {job.status === "awaiting_quote_approval" && (
-                    <div className="flex gap-3 mt-6">
-                      <Button
-                        className="flex-1"
-                        onClick={async () => {
-                          "use server";
-                        }}
-                      >
-                        Approve Quote
-                      </Button>
-                      <Button variant="outline" className="flex-1">
-                        Reject
-                      </Button>
-                    </div>
+                    <QuoteActions quoteId={(latestQuote as Quote).id} />
                   )}
                 </CardContent>
               </Card>

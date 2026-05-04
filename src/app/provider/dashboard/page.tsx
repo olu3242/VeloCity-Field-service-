@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { OfferActions } from "@/components/jobs/offer-actions";
+import { OnlineToggle } from "@/components/provider/online-toggle";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -66,8 +68,7 @@ export default async function ProviderDashboard() {
       <nav className="bg-white border-b px-6 py-4 flex items-center justify-between">
         <Link href="/" className="font-bold text-xl text-velocity-700">⚡ VeloCity</Link>
         <div className="flex items-center gap-4">
-          <div className={`h-2.5 w-2.5 rounded-full ${provider.is_online ? "bg-green-500 animate-pulse-ring" : "bg-gray-300"}`} />
-          <span className="text-sm text-gray-600">{provider.is_online ? "Online" : "Offline"}</span>
+          <OnlineToggle providerId={provider.id} isOnline={provider.is_online} />
           <span className="text-sm text-gray-600">{profile?.full_name}</span>
         </div>
       </nav>
@@ -132,10 +133,7 @@ export default async function ProviderDashboard() {
                           )}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm">Accept</Button>
-                        <Button size="sm" variant="outline">Pass</Button>
-                      </div>
+                      <OfferActions offerId={offer.id} />
                     </CardContent>
                   </Card>
                 );
