@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { max } from "@/lib/agents/max";
+import { dispatchSchema, validationError } from "@/lib/validation";
+import { createInAppNotification } from "@/lib/notifications/server";
 import type { Provider, Job } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -19,7 +21,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { job_id } = await request.json();
+  const parsed = dispatchSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed.error), { status: 400 });
+  }
+  const { job_id, provider_id } = parsed.data;
 
   const adminClient = await createAdminClient();
 
@@ -39,14 +45,18 @@ export async function POST(request: NextRequest) {
     .eq("is_online", true)
     .contains("categories", [job.category]);
 
-  if (!providers?.length) {
+  const eligibleProviders = provider_id
+    ? providers?.filter((provider) => provider.id === provider_id)
+    : providers;
+
+  if (!eligibleProviders?.length) {
     return NextResponse.json({ error: "No available providers" }, { status: 422 });
   }
 
   // MAX ranks providers
   const maxOutput = await max.match(
     job as Partial<Job>,
-    providers as Partial<Provider>[],
+    eligibleProviders as Partial<Provider>[],
     { jobId: job_id }
   );
 
@@ -78,6 +88,20 @@ export async function POST(request: NextRequest) {
 
   // Update job status to offer_sent
   await adminClient.from("jobs").update({ status: "offer_sent" }).eq("id", job_id);
+
+  await Promise.all(
+    topProviders.map(async (p) => {
+      const provider = eligibleProviders.find((item) => item.id === p.provider_id);
+      if (provider?.user_id) {
+        await createInAppNotification(adminClient, {
+          userId: provider.user_id,
+          title: "New job offer",
+          body: `A ${job.category} job is available in ${job.city ?? "your area"}.`,
+          data: { job_id, provider_id: p.provider_id },
+        });
+      }
+    })
+  );
 
   return NextResponse.json({
     data: { offers_sent: topProviders.length, max_output: maxOutput },

@@ -1,6 +1,7 @@
 // ALICE — Customer Intake & Classification Agent
 import { BaseAgent } from "./base";
 import type { AIClassification, ServiceCategory, UrgencyLevel } from "@/types";
+import { hasEnv } from "@/lib/env";
 
 export interface AliceOutput {
   category: ServiceCategory;
@@ -50,6 +51,10 @@ ALWAYS respond with valid JSON in this exact format:
     zip: string,
     context: { jobId?: string; userId?: string } = {}
   ): Promise<AliceOutput | null> {
+    if (!hasEnv("ANTHROPIC_API_KEY")) {
+      return fallbackClassification(description);
+    }
+
     const prompt = `Customer service request:
 Description: ${description}
 Service ZIP: ${zip}
@@ -62,3 +67,36 @@ Classify this request and respond with JSON.`;
 }
 
 export const alice = new AliceAgent();
+
+function fallbackClassification(description: string): AliceOutput {
+  const text = description.toLowerCase();
+  const categoryRules: Array<[ServiceCategory, string[]]> = [
+    ["plumbing", ["leak", "pipe", "faucet", "toilet", "drain", "water"]],
+    ["electrical", ["outlet", "breaker", "light", "wiring", "electric"]],
+    ["hvac", ["ac", "air conditioner", "heat", "furnace", "hvac"]],
+    ["cleaning", ["clean", "maid", "deep clean"]],
+    ["landscaping", ["lawn", "yard", "tree", "landscape"]],
+    ["locksmith", ["lock", "key", "locked out"]],
+    ["appliance_repair", ["washer", "dryer", "fridge", "oven", "dishwasher"]],
+    ["handyman", ["repair", "install", "mount", "fix"]],
+  ];
+
+  const category = categoryRules.find(([, keywords]) =>
+    keywords.some((keyword) => text.includes(keyword))
+  )?.[0] ?? "other";
+  const urgency: UrgencyLevel =
+    /burst|flood|sparking|no heat|no ac|locked out|emergency/.test(text) ? "emergency" : "scheduled";
+
+  return {
+    category,
+    urgency,
+    complexity: text.length > 240 ? "complex" : text.length > 100 ? "moderate" : "simple",
+    estimated_duration_hours: urgency === "emergency" ? 2 : 3,
+    estimated_cost_range: { min: urgency === "emergency" ? 175 : 95, max: urgency === "emergency" ? 550 : 350 },
+    skills_required: [category.replace("_", " ")],
+    title: description.split(":")[0]?.slice(0, 80) || "Service request",
+    is_serviceable: true,
+    confidence: 0.6,
+    customer_message: "We received your request and will route it using deterministic matching until AI is configured.",
+  };
+}

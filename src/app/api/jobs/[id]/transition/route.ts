@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canTransition } from "@/lib/workflows/job-state-machine";
 import { checkGovernance } from "@/lib/automation/governance";
 import { nova } from "@/lib/agents/nova";
+import { transitionSchema, validationError } from "@/lib/validation";
 import type { JobStatus, UserRole } from "@/types";
 
 export async function POST(
@@ -15,10 +16,11 @@ export async function POST(
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { to_status, reason } = await request.json() as {
-    to_status: JobStatus;
-    reason?: string;
-  };
+  const parsed = transitionSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed.error), { status: 400 });
+  }
+  const { to_status, reason } = parsed.data as { to_status: JobStatus; reason?: string };
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -38,7 +40,21 @@ export async function POST(
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
-  // ── State machine check ────────────────────────────────────
+  if (actorRole === "customer" && job.customer_id !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (actorRole === "provider") {
+    const { data: provider } = await supabase
+      .from("providers")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+    if (!provider || job.provider_id !== provider.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   const { allowed, requiresReason } = canTransition(
     job.status as JobStatus,
     to_status,

@@ -1,6 +1,7 @@
 // QUINN — Quote & Pricing Agent
 import { BaseAgent } from "./base";
 import type { QuoteLineItem, ServiceCategory, UrgencyLevel } from "@/types";
+import { hasEnv } from "@/lib/env";
 
 export interface QuinnOutput {
   is_fair: boolean;
@@ -71,6 +72,10 @@ ALWAYS respond with valid JSON for review requests:
     context: { jobId?: string } = {}
   ): Promise<QuinnOutput | null> {
     const total = lineItems.reduce((sum, li) => sum + li.total_cents, 0);
+    if (!hasEnv("ANTHROPIC_API_KEY")) {
+      return fallbackQuoteReview(lineItems, total);
+    }
+
     const prompt = `Review this quote for a ${urgency} ${category} job in ${city}, ${state}:
 
 Line items:
@@ -102,3 +107,23 @@ Respond with JSON containing line_items (array), subtotal_cents, tax_cents, tota
 }
 
 export const quinn = new QuinnAgent();
+
+function fallbackQuoteReview(lineItems: QuoteLineItem[], total: number): QuinnOutput {
+  const suspiciousItems = lineItems.filter((item) => item.quantity * item.unit_price_cents !== item.total_cents);
+
+  return {
+    is_fair: suspiciousItems.length === 0 && total > 0,
+    market_rate_range: { min: Math.round(total * 0.75), max: Math.round(total * 1.35) },
+    variance_percent: 0,
+    line_item_analysis: lineItems.map((item) => ({
+      description: item.description,
+      submitted_cents: item.total_cents,
+      market_cents: item.total_cents,
+      flag: item.quantity * item.unit_price_cents === item.total_cents ? "ok" : "suspicious",
+      note: item.quantity * item.unit_price_cents === item.total_cents ? undefined : "Line item total does not match quantity times unit price.",
+    })),
+    recommendation: suspiciousItems.length ? "request_breakdown" : "approve",
+    overcharge_detected: false,
+    customer_message: "This quote passed deterministic validation. Configure Anthropic for market-rate AI review.",
+  };
+}

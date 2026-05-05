@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { alice } from "@/lib/agents/alice";
-import type { BookingFormData } from "@/types";
+import { bookingSchema, validationError } from "@/lib/validation";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -59,7 +59,11 @@ export async function POST(request: NextRequest) {
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body: BookingFormData = await request.json();
+  const parsed = bookingSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed.error), { status: 400 });
+  }
+  const body = parsed.data;
 
   // ALICE classifies the job
   const classification = await alice.classify(

@@ -65,7 +65,7 @@ ALWAYS respond with valid JSON. Be warm and human — this is a relationship, no
     lastJobDaysAgo: number,
     context: { userId?: string } = {}
   ): Promise<LenaRebookOutput | null> {
-    const categories = [...new Set(pastJobs.map((j) => j.category))];
+    const categories = Array.from(new Set(pastJobs.map((j) => j.category)));
     const avgRating = 4.2;
 
     const prompt = `Customer rebooking analysis:

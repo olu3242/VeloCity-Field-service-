@@ -1,6 +1,7 @@
 // NOVA — Job Workflow Orchestration Agent
 import { BaseAgent } from "./base";
 import type { Job, JobStatus } from "@/types";
+import { hasEnv } from "@/lib/env";
 
 export interface NovaTransitionOutput {
   allowed: boolean;
@@ -66,6 +67,23 @@ ALWAYS respond with valid JSON for transition analysis:
     actorRole: "customer" | "provider" | "admin",
     context: { jobId?: string } = {}
   ): Promise<NovaTransitionOutput | null> {
+    if (!hasEnv("ANTHROPIC_API_KEY")) {
+      return {
+        allowed: true,
+        next_status: toStatus,
+        actions_required: [],
+        notifications: [
+          {
+            recipient: "customer",
+            title: "Job status updated",
+            body: `Your job status changed to ${toStatus.replace(/_/g, " ")}.`,
+            channel: "in_app",
+          },
+        ],
+        automation_hooks: [],
+      };
+    }
+
     const prompt = `Job transition request:
 Job ID: ${job.id}
 Current status: ${job.status}

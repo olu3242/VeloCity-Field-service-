@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+import { validationError } from "@/lib/validation";
+
+const providerStatusActionSchema = z.object({
+  action: z.enum(["approve", "reject", "suspend", "toggle_online"]),
+  reason: z.string().trim().max(1000).optional(),
+});
 
 export async function POST(
   request: NextRequest,
@@ -13,10 +20,11 @@ export async function POST(
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
 
   // Allow admins to approve/reject/suspend; providers to toggle online
-  const { action, reason } = await request.json() as {
-    action: "approve" | "reject" | "suspend" | "toggle_online";
-    reason?: string;
-  };
+  const parsed = providerStatusActionSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed.error), { status: 400 });
+  }
+  const { action, reason } = parsed.data;
 
   if (action === "toggle_online") {
     const { data: provider } = await supabase.from("providers").select("is_online, user_id").eq("id", id).single();
@@ -34,6 +42,10 @@ export async function POST(
     reject: "rejected",
     suspend: "suspended",
   };
+
+  if ((action === "reject" || action === "suspend") && !reason) {
+    return NextResponse.json({ error: "Reason required for this provider action" }, { status: 400 });
+  }
 
   const updates: Record<string, unknown> = { status: statusMap[action] };
   if (action === "approve") updates.approved_at = new Date().toISOString();
