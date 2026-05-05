@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canTransition } from "@/lib/workflows/job-state-machine";
+import { checkGovernance } from "@/lib/automation/governance";
 import { nova } from "@/lib/agents/nova";
 import type { JobStatus, UserRole } from "@/types";
 
@@ -37,6 +38,7 @@ export async function POST(
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
+  // ── State machine check ────────────────────────────────────
   const { allowed, requiresReason } = canTransition(
     job.status as JobStatus,
     to_status,
@@ -54,10 +56,34 @@ export async function POST(
     return NextResponse.json({ error: "Reason required for this transition" }, { status: 400 });
   }
 
-  // NOVA analyzes the transition for notifications/automations
+  // ── GABRIEL governance check ───────────────────────────────
+  try {
+    const governance = await checkGovernance({
+      jobId: id,
+      fromStatus: job.status as JobStatus,
+      toStatus: to_status,
+      actorRole,
+      reason,
+    });
+
+    if (!governance.approved) {
+      return NextResponse.json(
+        {
+          error: governance.reason ?? "Transition blocked by governance policy",
+          policy_violations: governance.policy_violations,
+          risk_level: governance.risk_level,
+        },
+        { status: 403 }
+      );
+    }
+  } catch {
+    // Governance failure is non-blocking — log and continue
+  }
+
+  // ── NOVA analyzes the transition ───────────────────────────
   const novaAnalysis = await nova.analyzeTransition(job, to_status, actorRole, { jobId: id });
 
-  // Apply the transition
+  // ── Apply the transition ───────────────────────────────────
   const { data: updatedJob, error: updateError } = await supabase
     .from("jobs")
     .update({ status: to_status })
@@ -69,7 +95,7 @@ export async function POST(
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
-  // Log the transition with actor info
+  // ── Log the transition ────────────────────────────────────
   await supabase.from("job_status_history").insert({
     job_id: id,
     from_status: job.status,
@@ -79,6 +105,38 @@ export async function POST(
     reason: reason ?? null,
     metadata: { nova_analysis: novaAnalysis ?? {} },
   });
+
+  // ── Emit automation event (non-blocking) ──────────────────
+  try {
+    const { emitEvent } = await import("@/lib/automation/emitEvent");
+    await emitEvent(
+      "job_state_changed",
+      {
+        job_id:      id,
+        from_status: job.status,
+        to_status,
+        actor_role:  actorRole,
+        reason:      reason ?? null,
+      },
+      `transition:${id}:${job.status}:${to_status}`
+    );
+
+    // Special events for key transitions
+    if (to_status === "accepted") {
+      await emitEvent("job_accepted", { job_id: id, provider_id: job.provider_id, customer_id: job.customer_id, urgency: job.urgency }, `job_accepted:${id}`);
+    }
+    if (to_status === "completed_pending_confirmation") {
+      await emitEvent("job_completed", { job_id: id, provider_id: job.provider_id, customer_id: job.customer_id, total_cents: 0 }, `job_completed:${id}`);
+    }
+    if (to_status === "customer_confirmed") {
+      await emitEvent("customer_confirmed", { job_id: id, provider_id: job.provider_id, customer_id: job.customer_id, total_cents: 0 }, `customer_confirmed:${id}`);
+    }
+    if (to_status === "disputed") {
+      await emitEvent("dispute_opened", { job_id: id, dispute_id: null, customer_id: job.customer_id, provider_id: job.provider_id, reason: reason ?? "disputed" }, `dispute_opened:${id}`);
+    }
+  } catch {
+    // Automation failure must never block the API response
+  }
 
   return NextResponse.json({
     data: updatedJob,

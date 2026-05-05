@@ -68,6 +68,9 @@ export default async function AdminDashboard() {
           <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
             <Link href="/admin/disputes">Disputes</Link>
           </Button>
+          <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
+            <Link href="/admin/automation">⚙ Automation</Link>
+          </Button>
         </div>
       </nav>
 

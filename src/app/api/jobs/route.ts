@@ -95,5 +95,25 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // ── Emit automation event (non-blocking) ─────────────────
+  try {
+    const { emitEvent } = await import("@/lib/automation/emitEvent");
+    await emitEvent(
+      "service_request_created",
+      {
+        job_id:      job.id,
+        customer_id: user.id,
+        category:    job.category,
+        urgency:     job.urgency,
+        zip:         job.zip,
+        title:       job.title,
+        description: job.description,
+      },
+      `service_request_created:${job.id}`
+    );
+  } catch {
+    // Automation failure must never block the API response
+  }
+
   return NextResponse.json({ data: job }, { status: 201 });
 }
