@@ -291,6 +291,118 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["subscriptions"]["Row"], "id" | "created_at" | "updated_at">;
         Update: Partial<Database["public"]["Tables"]["subscriptions"]["Insert"]>;
       };
+      automation_events: {
+        Row: {
+          id: string;
+          event_type: string;
+          payload: Json;
+          dedup_key: string | null;
+          status: "received" | "processing" | "completed" | "failed";
+          retry_count: number;
+          created_at: string;
+          processed_at: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["automation_events"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["automation_events"]["Insert"]>;
+      };
+      automation_queue: {
+        Row: {
+          id: string;
+          event_id: string | null;
+          event_type: string;
+          payload: Json;
+          status: "pending" | "processing" | "completed" | "failed" | "skipped";
+          retry_count: number;
+          max_retries: number;
+          next_retry_at: string;
+          dedup_key: string | null;
+          error_message: string | null;
+          created_at: string;
+          processed_at: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["automation_queue"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["automation_queue"]["Insert"]>;
+      };
+      automation_runs: {
+        Row: {
+          id: string;
+          queue_id: string | null;
+          event_type: string;
+          handler: string;
+          input: Json;
+          output: Json | null;
+          status: "running" | "completed" | "failed" | "skipped";
+          duration_ms: number | null;
+          error_message: string | null;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["automation_runs"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["automation_runs"]["Insert"]>;
+      };
+      automation_rules: {
+        Row: {
+          id: string;
+          event_type: string;
+          rule_name: string;
+          condition: Json;
+          action: Json;
+          is_active: boolean;
+          priority: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["automation_rules"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["automation_rules"]["Insert"]>;
+      };
+      payout_queue: {
+        Row: {
+          id: string;
+          job_id: string;
+          provider_id: string;
+          amount_cents: number;
+          platform_fee_cents: number;
+          net_payout_cents: number;
+          status: "queued" | "processing" | "released" | "failed" | "held";
+          hold_reason: string | null;
+          release_after: string;
+          attempts: number;
+          stripe_transfer_id: string | null;
+          error_message: string | null;
+          created_at: string;
+          released_at: string | null;
+        };
+        Insert: Omit<Database["public"]["Tables"]["payout_queue"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["payout_queue"]["Insert"]>;
+      };
+      audit_logs: {
+        Row: {
+          id: string;
+          actor_type: "user" | "agent" | "system" | "cron";
+          actor_id: string | null;
+          action: string;
+          resource: string;
+          resource_id: string | null;
+          payload: Json;
+          result: string | null;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["audit_logs"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["audit_logs"]["Insert"]>;
+      };
+      sla_configs: {
+        Row: {
+          id: string;
+          event_type: string;
+          warn_after_minutes: number;
+          breach_after_minutes: number;
+          escalate_after_minutes: number;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["sla_configs"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["sla_configs"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
