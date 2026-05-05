@@ -132,6 +132,43 @@ export const disputeSchema = z.object({
   evidence_urls: z.array(z.string().url()).default([]),
 });
 
+// ── Tips ────────────────────────────────────────────────────
+
+export const tipSchema = z.object({
+  job_id: z.string().uuid({ message: "job_id must be a valid UUID" }),
+  amount_cents: z
+    .number({ error: "amount_cents is required" })
+    .int("amount_cents must be an integer")
+    .min(100, "Minimum tip is $1.00")
+    .max(100_000_00, "Maximum tip is $10,000"),
+  note: z
+    .string()
+    .max(500, "Note must be 500 characters or fewer")
+    .optional()
+    .nullable(),
+});
+
+export type TipInput = z.infer<typeof tipSchema>;
+
+export const reviewSchema = z.object({
+  job_id: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().max(2000).optional().nullable(),
+});
+
+export type ReviewInput = z.infer<typeof reviewSchema>;
+
+// ── Helpers ─────────────────────────────────────────────────
+
+export function parseBody<T>(schema: z.ZodSchema<T>, data: unknown):
+  | { success: true; data: T }
+  | { success: false; error: string } {
+  const result = schema.safeParse(data);
+  if (result.success) return { success: true, data: result.data };
+  const messages = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+  return { success: false, error: messages };
+}
+
 export function validationError(error: unknown) {
   if (error instanceof z.ZodError) {
     return {

@@ -13,6 +13,7 @@ import { handleTessTerritory }    from "./handlers/tess-territory";
 import { handleSLACheck }         from "./handlers/sla-check";
 import { handlePayoutRelease }    from "./handlers/payout-release";
 import { handleProviderOffer }    from "./handlers/provider-offer";
+import { handleTipSubmitted }     from "./handlers/tip-submitted";
 
 export async function route(
   eventType: AutomationEventType,
@@ -82,6 +83,10 @@ export async function route(
     case "retention_campaign":
     case "provider_scoring":
       return handleLenaRetention(payload, queueItem);
+
+    // ── Tips ──────────────────────────────────────────────────
+    case "tip_submitted":
+      return handleTipSubmitted(payload, queueItem);
 
     // ── Catch-all (agent_run, unknown) ────────────────────
     default:

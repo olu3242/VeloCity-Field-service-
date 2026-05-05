@@ -52,6 +52,17 @@ export default async function ProviderDashboard() {
     .is("rejected_at", null)
     .order("offered_at", { ascending: false });
 
+  // Tips received
+  const { data: tips } = await supabase
+    .from("provider_tips")
+    .select("id, job_id, amount_cents, note, payment_status, created_at")
+    .eq("provider_id", provider.id)
+    .eq("payment_status", "succeeded")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const totalTipsCents = tips?.reduce((sum, t) => sum + (t.amount_cents ?? 0), 0) ?? 0;
+
   const activeJobs = jobs?.filter((j) =>
     ["accepted", "scheduled", "deposit_paid", "en_route", "arrived", "diagnosis_in_progress", "quote_approved", "in_progress"].includes(j.status)
   );
@@ -108,6 +119,38 @@ export default async function ProviderDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Tips section */}
+        {(tips?.length ?? 0) > 0 && (
+          <Card className="mb-8 border-rose-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <span>💝</span>
+                Tips Received
+                <span className="ml-auto text-emerald-700 font-bold">{formatCents(totalTipsCents)}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="divide-y">
+                {tips?.map((tip) => (
+                  <div key={tip.id} className="py-2.5 flex items-start justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-emerald-700">
+                        +{formatCents(tip.amount_cents)}
+                      </div>
+                      {tip.note && (
+                        <p className="text-xs text-gray-500 italic mt-0.5">"{tip.note}"</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400">
+                      {new Date(tip.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* New Offers */}
         {offers && offers.length > 0 && (

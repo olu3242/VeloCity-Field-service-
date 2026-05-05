@@ -28,6 +28,7 @@ export type AutomationEventType =
   | "daily_territory_analysis"
   | "retention_campaign"
   | "provider_scoring"
+  | "tip_submitted"
   | "agent_run";
 
 export type QueueStatus = "pending" | "processing" | "completed" | "failed" | "skipped";
@@ -118,7 +119,17 @@ export interface SLAPayload {
   threshold_minutes: number;
 }
 
+export interface TipSubmittedPayload {
+  tip_id: string;
+  job_id: string;
+  provider_id: string;
+  customer_id: string;
+  amount_cents: number;
+  note?: string | null;
+}
+
 export type AutomationPayload =
+  | TipSubmittedPayload
   | ServiceRequestCreatedPayload
   | ServiceabilityPassedPayload
   | JobAcceptedPayload
