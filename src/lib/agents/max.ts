@@ -1,5 +1,5 @@
 // MAX — Dispatch & Provider Matching Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 import type { Provider, Job } from "@/types";
 import { hasEnv } from "@/lib/env";
 
@@ -53,7 +53,7 @@ ALWAYS respond with valid JSON:
   async match(
     job: Partial<Job>,
     providers: Partial<Provider>[],
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<MaxOutput | null> {
     if (!hasEnv("ANTHROPIC_API_KEY")) {
       return fallbackMatch(providers);

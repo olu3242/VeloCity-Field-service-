@@ -1,0 +1,479 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Activity, AlertTriangle, ArrowUpRight, Banknote, Clock, Map as MapIcon, ShieldCheck, Users, Zap } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCents } from "@/lib/utils";
+import {
+  buildExecutiveSummary,
+  buildRecommendedActions,
+  calculateAutomationHealthScore,
+  calculateMarketplaceHealthScore,
+  calculateOpsHealthScore,
+  calculateRevenueHealthScore,
+  type CommandCenterMetrics,
+} from "@/lib/command-center";
+import { calculateRetentionProbabilityScore, calculateTerritoryHealthScore } from "@/lib/scoring";
+import { calculateCommission } from "@/lib/revenue";
+import { analyzeSupplyGap } from "@/lib/expansion";
+import { getTenantId } from "@/lib/tenancy";
+import type { Job, Payment, Provider, ServiceCategory } from "@/types";
+
+const DONE_STATUSES = ["completed", "closed"];
+const INACTIVE_STATUSES = ["completed", "closed", "cancelled", "expired", "refunded"];
+
+function levelVariant(level: string): "success" | "warning" | "destructive" | "secondary" {
+  if (level === "low") return "success";
+  if (level === "medium") return "warning";
+  if (level === "high" || level === "critical") return "destructive";
+  return "secondary";
+}
+
+function buildFallbackMetrics(): CommandCenterMetrics {
+  return {
+    gmvCents: 0,
+    netRevenueCents: 0,
+    commissionRevenueCents: 0,
+    averageJobValueCents: 0,
+    activeJobs: 0,
+    unassignedJobs: 0,
+    slaBreaches: 0,
+    paymentFailures: 0,
+    payoutQueue: 0,
+    disputes: 0,
+    providerSupplyGaps: 0,
+    churnRisk: 45,
+    territoryReadiness: 50,
+    aiAgentActivity: 0,
+    failedAutomations: 0,
+    pricingFlags: 0,
+    payoutHolds: 0,
+    refundRisk: 0,
+    revenueLeakageAlerts: 0,
+    activeProviders: 0,
+    totalProviders: 0,
+    completedJobs: 0,
+  };
+}
+
+export default async function AdminCommandCenterPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login");
+
+  const { data: profile } = await supabase.from("profiles").select("role, tenant_id").eq("id", user.id).single();
+  if (profile?.role !== "admin") redirect("/dashboard");
+  const tenantId = getTenantId(profile);
+
+  const [
+    { data: jobs },
+    { data: providers },
+    { data: payments },
+    { data: disputes },
+    { data: agentLogs },
+    { data: serviceAreas },
+    { data: automationQueue },
+    { data: pricingDecisions },
+    { data: payoutLedger },
+    { data: refundRecords },
+    { data: accessAudits },
+    { data: settingsAudits },
+    { data: personaAssignments },
+    { data: profiles },
+  ] = await Promise.all([
+    supabase.from("jobs").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(500),
+    supabase.from("providers").select("*").eq("tenant_id", tenantId).limit(500),
+    supabase.from("payments").select("*").eq("tenant_id", tenantId).limit(500),
+    supabase.from("disputes").select("*").eq("tenant_id", tenantId).limit(200),
+    supabase.from("agent_logs").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("service_areas").select("*").eq("tenant_id", tenantId).limit(50),
+    supabase.from("automation_queue").select("id,status,retry_count,error_message,event_type,processed_at,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("pricing_decisions").select("id,status,risk_flags,confidence_score,final_price,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("payout_ledger").select("id,status,retry_count,amount,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("refund_records").select("id,status,amount,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("access_audit_logs").select("id,decision,persona_key,object_key,action_key,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("settings_audit_logs").select("id,setting_type,setting_key,action,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("persona_assignments").select("id,user_id,personas(key,name)").eq("tenant_id", tenantId).eq("is_active", true).limit(200),
+    supabase.from("profiles").select("id,role,created_at").eq("tenant_id", tenantId).limit(200),
+  ]);
+
+  const jobRows = (jobs ?? []) as Job[];
+  const providerRows = (providers ?? []) as Provider[];
+  const paymentRows = (payments ?? []) as Payment[];
+  const completedJobs = jobRows.filter((job) => DONE_STATUSES.includes(job.status));
+  const activeJobs = jobRows.filter((job) => !INACTIVE_STATUSES.includes(job.status));
+  const unassignedJobs = activeJobs.filter((job) => !job.provider_id);
+  const gmvCents = completedJobs.reduce((sum, job) => sum + (job.final_cost_cents ?? job.quoted_cost_cents ?? 0), 0);
+  const commissionRevenueCents = completedJobs.reduce((sum, job) => {
+    const amount = job.final_cost_cents ?? job.quoted_cost_cents ?? 0;
+    return sum + calculateCommission(job.category, amount).platformFeeCents;
+  }, 0);
+  const failedPayments = paymentRows.filter((payment) => payment.status === "failed");
+  const pricingRows = pricingDecisions ?? [];
+  const payoutRows = payoutLedger ?? [];
+  const refundRows = refundRecords ?? [];
+  const pricingFlags = pricingRows.filter((decision) => {
+    const flags = Array.isArray(decision.risk_flags) ? decision.risk_flags : [];
+    return decision.status === "flagged" || flags.length > 0 || Number(decision.confidence_score ?? 100) < 70;
+  });
+  const payoutHolds = payoutRows.filter((payout) => payout.status === "payout_hold" || payout.status === "held" || payout.status === "failed");
+  const refundRisk = refundRows.filter((refund) => refund.status !== "refunded" || Number(refund.amount ?? 0) > 0);
+  const revenueLeakageAlerts = pricingRows.filter((decision) => {
+    const flags = Array.isArray(decision.risk_flags) ? decision.risk_flags.map(String) : [];
+    return flags.some((flag: string) => flag.includes("underpricing") || flag.includes("low"));
+  });
+  const deniedAccessAttempts = (accessAudits ?? []).filter((log) => log.decision === "denied");
+  const personaCounts = new Map<string, number>();
+  (personaAssignments ?? []).forEach((assignment) => {
+    const persona = assignment.personas as { name?: string; key?: string } | null;
+    const label = persona?.name ?? persona?.key ?? "Unassigned";
+    personaCounts.set(label, (personaCounts.get(label) ?? 0) + 1);
+  });
+  const inactiveUsers = Math.max(0, (profiles?.length ?? 0) - (personaAssignments?.length ?? 0));
+  const highRiskUsers = deniedAccessAttempts.filter((log) => {
+    const createdAt = new Date(log.created_at).getTime();
+    return Number.isFinite(createdAt) && Date.now() - createdAt < 7 * 24 * 60 * 60 * 1000;
+  }).length;
+  const failedAutomations = (automationQueue ?? []).filter((item) => item.status === "failed" || Boolean(item.error_message));
+  const automationRows = automationQueue ?? [];
+  const pendingAutomations = automationRows.filter((item) => item.status === "pending");
+  const completedAutomations = automationRows.filter((item) => item.status === "completed");
+  const retryTotal = automationRows.reduce((sum, item) => sum + Number(item.retry_count ?? 0), 0);
+  const lastProcessedAutomation = automationRows
+    .filter((item) => item.processed_at)
+    .sort((a, b) => String(b.processed_at).localeCompare(String(a.processed_at)))[0];
+  const payoutQueue = paymentRows.filter((payment) => payment.status === "escrowed" || payment.status === "captured");
+  const activeProviders = providerRows.filter((provider) => provider.status === "approved" && provider.is_online);
+  const totalProviders = providerRows.length;
+  const supplyGaps = (["plumbing", "electrical", "hvac", "cleaning", "handyman"] as ServiceCategory[])
+    .map((category) =>
+      analyzeSupplyGap({
+        category,
+        expectedJobs: Math.max(3, activeJobs.filter((job) => job.category === category).length + 4),
+        activeProviders: providerRows.filter((provider) => provider.status === "approved" && provider.categories?.includes(category)).length,
+      })
+    )
+    .filter((gap) => gap.providersNeeded > 0);
+
+  const retention = calculateRetentionProbabilityScore({
+    daysSinceLastJob: completedJobs.length ? 21 : 90,
+    completedJobs: completedJobs.length,
+    openDisputes: disputes?.length ?? 0,
+    recurringCategory: true,
+  });
+  const territory = calculateTerritoryHealthScore({
+    demandIndex: Math.min(100, activeJobs.length * 6 + 20),
+    providerCount: activeProviders.length,
+    activeCustomers: new Set(jobRows.map((job) => job.customer_id)).size,
+    completedJobs: completedJobs.length,
+    revenueCents: gmvCents,
+    disputeRate: jobRows.length ? (disputes?.length ?? 0) / jobRows.length : 0,
+    slaHitRate: 0.86,
+  });
+
+  const metrics: CommandCenterMetrics = jobRows.length || providerRows.length || paymentRows.length
+    ? {
+        gmvCents,
+        netRevenueCents: commissionRevenueCents,
+        commissionRevenueCents,
+        averageJobValueCents: completedJobs.length ? Math.round(gmvCents / completedJobs.length) : 0,
+        activeJobs: activeJobs.length,
+        unassignedJobs: unassignedJobs.length,
+        slaBreaches: activeJobs.filter((job) => job.urgency === "emergency" && !job.provider_id).length,
+        paymentFailures: failedPayments.length,
+        payoutQueue: payoutQueue.length,
+        disputes: disputes?.length ?? 0,
+        providerSupplyGaps: supplyGaps.length,
+        churnRisk: Math.max(0, 100 - retention.score),
+        territoryReadiness: territory.score,
+        aiAgentActivity: agentLogs?.length ?? 0,
+        failedAutomations: failedAutomations.length,
+        pricingFlags: pricingFlags.length,
+        payoutHolds: payoutHolds.length,
+        refundRisk: refundRisk.length,
+        revenueLeakageAlerts: revenueLeakageAlerts.length,
+        activeProviders: activeProviders.length,
+        totalProviders,
+        completedJobs: completedJobs.length,
+      }
+    : buildFallbackMetrics();
+
+  const ops = calculateOpsHealthScore(metrics);
+  const revenue = calculateRevenueHealthScore(metrics);
+  const automation = calculateAutomationHealthScore(metrics);
+  const marketplace = calculateMarketplaceHealthScore(metrics);
+  const summary = buildExecutiveSummary({ metrics, ops, revenue, automation, marketplace });
+  const actions = buildRecommendedActions(metrics);
+
+  const kpis = [
+    { label: "GMV", value: formatCents(metrics.gmvCents), icon: Banknote },
+    { label: "Net Revenue", value: formatCents(metrics.netRevenueCents), icon: ArrowUpRight },
+    { label: "Commission Revenue", value: formatCents(metrics.commissionRevenueCents), icon: Banknote },
+    { label: "Average Job Value", value: formatCents(metrics.averageJobValueCents), icon: Activity },
+    { label: "Active Jobs", value: String(metrics.activeJobs), icon: Clock },
+    { label: "Unassigned Jobs", value: String(metrics.unassignedJobs), icon: AlertTriangle },
+    { label: "SLA Breaches", value: String(metrics.slaBreaches), icon: AlertTriangle },
+    { label: "Payment Failures", value: String(metrics.paymentFailures), icon: AlertTriangle },
+    { label: "Payout Queue", value: String(metrics.payoutQueue), icon: Banknote },
+    { label: "Disputes", value: String(metrics.disputes), icon: ShieldCheck },
+    { label: "Supply Gaps", value: String(metrics.providerSupplyGaps), icon: Users },
+    { label: "Churn Risk", value: `${metrics.churnRisk}/100`, icon: Users },
+    { label: "Territory Readiness", value: `${metrics.territoryReadiness}/100`, icon: MapIcon },
+    { label: "AI Activity", value: String(metrics.aiAgentActivity), icon: Zap },
+    { label: "Failed Automations", value: String(metrics.failedAutomations), icon: AlertTriangle },
+    { label: "Pricing Flags", value: String(metrics.pricingFlags), icon: AlertTriangle },
+    { label: "Payout Holds", value: String(metrics.payoutHolds), icon: Banknote },
+    { label: "Refund Risk", value: String(metrics.refundRisk), icon: ShieldCheck },
+    { label: "Revenue Leakage", value: String(metrics.revenueLeakageAlerts), icon: ArrowUpRight },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="border-b bg-white px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
+          <Link href="/admin/dashboard" className="text-lg font-bold text-velocity-700">Velocity Command Center</Link>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm"><Link href="/admin/growth">Growth</Link></Button>
+            <Button asChild variant="outline" size="sm"><Link href="/admin/dashboard">Admin</Link></Button>
+          </div>
+        </div>
+      </nav>
+
+      <main className="mx-auto max-w-7xl px-4 py-8">
+        <section className="mb-6">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Revenue + Operations Command Center</h1>
+              <p className="mt-1 text-sm text-gray-500">{summary.narrative}</p>
+            </div>
+            <Badge variant={summary.riskPosture === "stable" ? "success" : summary.riskPosture === "watch" ? "warning" : "destructive"}>
+              {summary.headline}
+            </Badge>
+          </div>
+        </section>
+
+        <section className="mb-6 grid gap-4 md:grid-cols-4">
+          {[
+            { title: "Operations Health", score: ops },
+            { title: "Revenue Health", score: revenue },
+            { title: "Automation Health", score: automation },
+            { title: "Marketplace Health", score: marketplace },
+          ].map((item) => (
+            <Card key={item.title}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium text-gray-500">{item.title}</div>
+                  <Badge variant={levelVariant(item.score.level)}>{item.score.level}</Badge>
+                </div>
+                <div className="mt-3 text-4xl font-bold">{item.score.score}</div>
+                <p className="mt-2 text-xs text-gray-500">{item.score.reasons[0]}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </section>
+
+        <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {kpis.map((kpi) => {
+            const Icon = kpi.icon;
+            return (
+              <Card key={kpi.label}>
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between">
+                    <Icon className="h-4 w-4 text-gray-400" />
+                    <span className="text-xs text-gray-400">live</span>
+                  </div>
+                  <div className="mt-3 text-xl font-bold">{kpi.value}</div>
+                  <div className="text-xs text-gray-500">{kpi.label}</div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </section>
+
+        <section className="mb-6 grid gap-4 lg:grid-cols-3">
+          <Card>
+            <CardHeader><CardTitle>Automation Queue</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-2 gap-3">
+              {[
+                { label: "Pending", value: pendingAutomations.length },
+                { label: "Completed", value: completedAutomations.length },
+                { label: "Failed", value: failedAutomations.length },
+                { label: "Retries", value: retryTotal },
+              ].map((item) => (
+                <div key={item.label} className="rounded-md border p-3">
+                  <div className="text-2xl font-bold">{item.value}</div>
+                  <div className="text-xs text-gray-500">{item.label}</div>
+                </div>
+              ))}
+              <div className="col-span-2 rounded-md bg-gray-100 p-3 text-sm">
+                <div className="font-medium">Last processed event</div>
+                <div className="text-xs text-gray-500">
+                  {lastProcessedAutomation ? `${lastProcessedAutomation.event_type} at ${lastProcessedAutomation.processed_at}` : "No processed automation events found."}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Recent Failed Events</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {failedAutomations.slice(0, 5).map((item) => (
+                <div key={item.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{item.event_type}</span>
+                    <Badge variant="destructive">{item.retry_count ?? 0} retries</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">{item.error_message ?? "No error message captured."}</p>
+                </div>
+              ))}
+              {!failedAutomations.length && <p className="text-sm text-gray-500">No failed automation events found.</p>}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Recent Agent Logs</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {(agentLogs ?? []).slice(0, 5).map((log) => (
+                <div key={log.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{log.agent_name}</span>
+                    <Badge variant={log.error ? "destructive" : "secondary"}>{log.error ? "error" : "logged"}</Badge>
+                  </div>
+                  <div className="text-xs text-gray-500">{log.action}</div>
+                </div>
+              ))}
+              {!agentLogs?.length && <p className="text-sm text-gray-500">No recent agent logs found.</p>}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Risk and Blocker Alerts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[
+                ...ops.recommendations.map((item) => ({ item, source: "Ops" })),
+                ...revenue.recommendations.map((item) => ({ item, source: "Revenue" })),
+                ...automation.recommendations.map((item) => ({ item, source: "Automation" })),
+                ...marketplace.recommendations.map((item) => ({ item, source: "Marketplace" })),
+              ].slice(0, 8).map((alert) => (
+                <div key={`${alert.source}-${alert.item}`} className="flex items-start justify-between rounded-md border p-3">
+                  <div>
+                    <div className="text-sm font-medium">{alert.item}</div>
+                    <div className="text-xs text-gray-500">Auditable source: {alert.source}</div>
+                  </div>
+                  <Badge variant="outline">{alert.source}</Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recommended Next Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {actions.map((action) => (
+                <div key={action.id} className="rounded-md border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold">{action.title}</div>
+                    <Badge variant={action.priority === "critical" || action.priority === "high" ? "destructive" : action.priority === "medium" ? "warning" : "secondary"}>
+                      {action.priority}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">{action.reason}</p>
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-gray-400">{action.auditEvent}</span>
+                    {action.href && <Link href={action.href} className="font-medium text-velocity-700">Open</Link>}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="mt-6 grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader><CardTitle>Security + Access</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {[
+                { label: "Denied attempts", value: deniedAccessAttempts.length },
+                { label: "Permission changes", value: settingsAudits?.length ?? 0 },
+                { label: "Inactive/unassigned users", value: inactiveUsers },
+                { label: "High-risk users", value: highRiskUsers },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-md bg-gray-100 p-3 text-sm">
+                  <span>{item.label}</span>
+                  <Badge variant={item.value ? "warning" : "secondary"}>{item.value}</Badge>
+                </div>
+              ))}
+              <Button asChild className="mt-2 w-full" variant="outline"><Link href="/admin/settings/audit">Open Access Audit</Link></Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Users by Persona</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {Array.from(personaCounts.entries()).slice(0, 6).map(([persona, count]) => (
+                <div key={persona} className="flex items-center justify-between rounded-md bg-gray-100 p-3 text-sm">
+                  <span>{persona}</span>
+                  <Badge variant="secondary">{count}</Badge>
+                </div>
+              ))}
+              {!personaCounts.size && <p className="text-sm text-gray-500">No persona assignments found.</p>}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Recent Settings Changes</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {(settingsAudits ?? []).slice(0, 5).map((log) => (
+                <div key={log.id} className="rounded-md bg-gray-100 p-3 text-sm">
+                  <div className="font-medium">{log.setting_type}: {log.setting_key}</div>
+                  <div className="text-xs text-gray-500">{log.action}</div>
+                </div>
+              ))}
+              {!settingsAudits?.length && <p className="text-sm text-gray-500">No settings changes found.</p>}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="mt-6 grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader><CardTitle>Provider Supply Gaps</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {supplyGaps.length ? supplyGaps.map((gap) => (
+                <div key={gap.category} className="flex items-center justify-between rounded-md bg-gray-100 p-3 text-sm">
+                  <span>{gap.category.replace("_", " ")}</span>
+                  <Badge variant={gap.severity === "high" ? "destructive" : "warning"}>{gap.providersNeeded} needed</Badge>
+                </div>
+              )) : <p className="text-sm text-gray-500">No supply gaps detected.</p>}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>AI Agent Activity</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {(agentLogs ?? []).slice(0, 5).map((log) => (
+                <div key={log.id} className="rounded-md bg-gray-100 p-3 text-sm">
+                  <div className="font-medium">{log.agent_name}</div>
+                  <div className="text-xs text-gray-500">{log.action}</div>
+                </div>
+              ))}
+              {!agentLogs?.length && <p className="text-sm text-gray-500">No recent agent activity.</p>}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Territory Expansion</CardTitle></CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{metrics.territoryReadiness}</div>
+              <p className="mt-2 text-sm text-gray-500">
+                Based on {serviceAreas?.length ?? 0} service areas, {metrics.activeProviders} online providers, and {metrics.completedJobs} completed jobs.
+              </p>
+              <Button asChild className="mt-4 w-full"><Link href="/admin/growth">Open Growth Dashboard</Link></Button>
+            </CardContent>
+          </Card>
+        </section>
+      </main>
+    </div>
+  );
+}

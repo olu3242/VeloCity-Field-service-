@@ -4,6 +4,8 @@ import { canTransition } from "@/lib/workflows/job-state-machine";
 import { checkGovernance } from "@/lib/automation/governance";
 import { nova } from "@/lib/agents/nova";
 import { transitionSchema, validationError } from "@/lib/validation";
+import { emitEvent } from "@/lib/automation/emitEvent";
+import { getTenantId } from "@/lib/tenancy";
 import type { JobStatus, UserRole } from "@/types";
 
 export async function POST(
@@ -24,16 +26,18 @@ export async function POST(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, tenant_id")
     .eq("id", user.id)
     .single();
 
   const actorRole = profile?.role as UserRole;
+  const tenantId = getTenantId(profile);
 
   const { data: job, error: jobError } = await supabase
     .from("jobs")
     .select("*")
     .eq("id", id)
+    .eq("tenant_id", tenantId)
     .single();
 
   if (jobError || !job) {
@@ -49,6 +53,7 @@ export async function POST(
       .from("providers")
       .select("id")
       .eq("user_id", user.id)
+      .eq("tenant_id", tenantId)
       .single();
     if (!provider || job.provider_id !== provider.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -97,13 +102,14 @@ export async function POST(
   }
 
   // ── NOVA analyzes the transition ───────────────────────────
-  const novaAnalysis = await nova.analyzeTransition(job, to_status, actorRole, { jobId: id });
+  const novaAnalysis = await nova.analyzeTransition(job, to_status, actorRole, { jobId: id, tenantId });
 
   // ── Apply the transition ───────────────────────────────────
   const { data: updatedJob, error: updateError } = await supabase
     .from("jobs")
     .update({ status: to_status })
     .eq("id", id)
+    .eq("tenant_id", tenantId)
     .select()
     .single();
 
@@ -114,6 +120,7 @@ export async function POST(
   // ── Log the transition ────────────────────────────────────
   await supabase.from("job_status_history").insert({
     job_id: id,
+    tenant_id: tenantId,
     from_status: job.status,
     to_status,
     actor_id: user.id,
@@ -122,36 +129,66 @@ export async function POST(
     metadata: { nova_analysis: novaAnalysis ?? {} },
   });
 
-  // ── Emit automation event (non-blocking) ──────────────────
   try {
-    const { emitEvent } = await import("@/lib/automation/emitEvent");
-    await emitEvent(
-      "job_state_changed",
-      {
-        job_id:      id,
-        from_status: job.status,
-        to_status,
-        actor_role:  actorRole,
-        reason:      reason ?? null,
-      },
-      `transition:${id}:${job.status}:${to_status}`
-    );
+    const basePayload = {
+      job_id: id,
+      tenant_id: tenantId,
+      customer_id: job.customer_id,
+      provider_id: job.provider_id,
+      from_status: job.status,
+      to_status,
+      actor_role: actorRole,
+      title: job.title,
+      category: job.category,
+    };
 
-    // Special events for key transitions
-    if (to_status === "accepted") {
-      await emitEvent("job_accepted", { job_id: id, provider_id: job.provider_id, customer_id: job.customer_id, urgency: job.urgency }, `job_accepted:${id}`);
+    await emitEvent(supabase, {
+      type: "job_state_changed",
+      source: "api.jobs.transition",
+      entityType: "job",
+      entityId: id,
+      actorId: user.id,
+      tenantId,
+      dedupKey: `job_state_changed:${id}:${to_status}:${Date.now()}`,
+      payload: basePayload,
+    });
+
+    const transitionEvent =
+      to_status === "accepted" ? "job_accepted" :
+      to_status === "in_progress" ? "job_started" :
+      to_status === "completed_pending_confirmation" ? "job_completed" :
+      to_status === "customer_confirmed" ? "customer_confirmed" :
+      to_status === "completed" ? "payout_queued" :
+      to_status === "disputed" ? "dispute_opened" :
+      null;
+
+    if (transitionEvent) {
+      await emitEvent(supabase, {
+        type: transitionEvent,
+        source: "api.jobs.transition",
+        entityType: "job",
+        entityId: id,
+        actorId: user.id,
+        tenantId,
+        dedupKey: `${transitionEvent}:${id}:${Date.now()}`,
+        payload: { ...basePayload, reason: reason ?? null },
+      });
     }
-    if (to_status === "completed_pending_confirmation") {
-      await emitEvent("job_completed", { job_id: id, provider_id: job.provider_id, customer_id: job.customer_id, total_cents: 0 }, `job_completed:${id}`);
-    }
-    if (to_status === "customer_confirmed") {
-      await emitEvent("customer_confirmed", { job_id: id, provider_id: job.provider_id, customer_id: job.customer_id, total_cents: 0 }, `customer_confirmed:${id}`);
-    }
-    if (to_status === "disputed") {
-      await emitEvent("dispute_opened", { job_id: id, dispute_id: null, customer_id: job.customer_id, provider_id: job.provider_id, reason: reason ?? "disputed" }, `dispute_opened:${id}`);
+
+    if (to_status === "customer_confirmed" || to_status === "completed") {
+      await emitEvent(supabase, {
+        type: "review_requested",
+        source: "api.jobs.transition",
+        entityType: "job",
+        entityId: id,
+        actorId: user.id,
+        tenantId,
+        dedupKey: `review_requested:${id}`,
+        payload: basePayload,
+      });
     }
   } catch {
-    // Automation failure must never block the API response
+    // Automation failure must never block the API response.
   }
 
   return NextResponse.json({

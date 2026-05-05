@@ -1,5 +1,5 @@
 // LENA — Customer Retention & Rebooking Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 import type { Job, ServiceCategory } from "@/types";
 
 export interface LenaRebookOutput {
@@ -63,7 +63,7 @@ ALWAYS respond with valid JSON. Be warm and human — this is a relationship, no
     customerId: string,
     pastJobs: Partial<Job>[],
     lastJobDaysAgo: number,
-    context: { userId?: string } = {}
+    context: AgentContext = {}
   ): Promise<LenaRebookOutput | null> {
     const categories = Array.from(new Set(pastJobs.map((j) => j.category)));
     const avgRating = 4.2;
@@ -93,7 +93,7 @@ What services should we proactively offer? Respond with JSON.`;
     lastJobStatus: string,
     daysSinceLastJob: number,
     totalJobs: number,
-    context: { userId?: string } = {}
+    context: AgentContext = {}
   ): Promise<LenaRetentionOutput | null> {
     const prompt = `Churn risk assessment:
 Customer ID: ${customerId}

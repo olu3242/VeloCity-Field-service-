@@ -1,5 +1,5 @@
 // IVY — Dispute Resolution Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 import type { Dispute, Job, Payment, Review } from "@/types";
 
 export interface IvyOutput {
@@ -50,7 +50,7 @@ ALWAYS respond with valid JSON.`;
     job: Partial<Job>,
     payments: Partial<Payment>[],
     review?: Partial<Review>,
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<IvyOutput | null> {
     const totalPaid = payments.reduce((sum, p) => sum + (p.amount_cents ?? 0), 0);
 

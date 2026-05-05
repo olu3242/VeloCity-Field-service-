@@ -7,14 +7,12 @@ create table if not exists tenants (
   id uuid primary key default uuid_generate_v4(),
   slug text not null unique,
   name text not null,
-  status text not null default 'active',
-  metadata jsonb default '{}',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-insert into tenants (id, slug, name, status)
-values ('00000000-0000-4000-8000-000000000001', 'velocity-default', 'VeloCity Default Tenant', 'active')
+insert into tenants (id, slug, name)
+values ('00000000-0000-4000-8000-000000000001', 'velocity-default', 'VeloCity Default Tenant')
 on conflict (id) do nothing;
 
 create or replace function app.default_tenant_id()
@@ -85,22 +83,63 @@ create index if not exists audit_logs_tenant_id_idx on audit_logs(tenant_id);
 alter table tenants enable row level security;
 
 create or replace function app.current_tenant_id()
-returns uuid language sql stable security definer as $$
-  select coalesce(
-    (select tenant_id from public.profiles where id = auth.uid()),
-    app.default_tenant_id()
-  );
+returns uuid language plpgsql stable security definer as $$
+declare
+  jwt_tenant uuid;
+  profile_tenant uuid;
+  remote_user_tenant uuid;
+begin
+  jwt_tenant := nullif(auth.jwt() ->> 'tenant_id', '')::uuid;
+  if jwt_tenant is not null then
+    return jwt_tenant;
+  end if;
+
+  select tenant_id into profile_tenant
+  from public.profiles
+  where id = auth.uid();
+  if profile_tenant is not null then
+    return profile_tenant;
+  end if;
+
+  if to_regclass('public.users') is not null then
+    execute 'select tenant_id from public.users where auth_uid = $1 limit 1'
+      into remote_user_tenant
+      using auth.uid();
+    if remote_user_tenant is not null then
+      return remote_user_tenant;
+    end if;
+  end if;
+
+  return app.default_tenant_id();
+end;
 $$;
 
 create or replace function app.is_tenant_admin(target_tenant_id uuid)
-returns boolean language sql stable security definer as $$
+returns boolean language plpgsql stable security definer as $$
+declare
+  is_velocity_admin boolean := false;
+  is_remote_admin boolean := false;
+begin
   select exists(
     select 1
     from public.profiles
     where id = auth.uid()
       and role = 'admin'
       and tenant_id = target_tenant_id
-  );
+  ) into is_velocity_admin;
+
+  if is_velocity_admin then
+    return true;
+  end if;
+
+  if to_regclass('public.users') is not null then
+    execute 'select exists(select 1 from public.users where auth_uid = $1 and role in (''super_admin'', ''tenant_admin'') and tenant_id = $2)'
+      into is_remote_admin
+      using auth.uid(), target_tenant_id;
+  end if;
+
+  return coalesce(is_remote_admin, false);
+end;
 $$;
 
 create policy "Users see own tenant" on tenants for select using (
@@ -295,7 +334,8 @@ begin
 end;
 $$;
 
-create or replace view job_events as
+drop view if exists job_events;
+create view job_events as
 select
   id,
   tenant_id,

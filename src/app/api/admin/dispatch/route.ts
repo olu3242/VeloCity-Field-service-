@@ -3,6 +3,9 @@ import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { max } from "@/lib/agents/max";
 import { dispatchSchema, validationError } from "@/lib/validation";
 import { createInAppNotification } from "@/lib/notifications/server";
+import { emitEvent } from "@/lib/automation/emitEvent";
+import { getTenantId } from "@/lib/tenancy";
+import { checkPermission } from "@/lib/access";
 import type { Provider, Job } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -13,7 +16,7 @@ export async function POST(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, tenant_id")
     .eq("id", user.id)
     .single();
 
@@ -26,6 +29,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(validationError(parsed.error), { status: 400 });
   }
   const { job_id, provider_id } = parsed.data;
+  const tenantId = getTenantId(profile);
+  const access = await checkPermission({ tenantId, userId: user.id, object: "jobs", action: "assign_provider", route: "/api/admin/dispatch" });
+  if (!access.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const adminClient = await createAdminClient();
 
@@ -33,6 +39,7 @@ export async function POST(request: NextRequest) {
     .from("jobs")
     .select("*")
     .eq("id", job_id)
+    .eq("tenant_id", tenantId)
     .single();
 
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
@@ -41,6 +48,7 @@ export async function POST(request: NextRequest) {
   const { data: providers } = await adminClient
     .from("providers")
     .select("*, profiles!providers_user_id_fkey(full_name)")
+    .eq("tenant_id", tenantId)
     .eq("status", "approved")
     .eq("is_online", true)
     .contains("categories", [job.category]);
@@ -77,6 +85,7 @@ export async function POST(request: NextRequest) {
     topProviders.map((p) =>
       adminClient.from("provider_offers").upsert({
         job_id,
+        tenant_id: tenantId,
         provider_id: p.provider_id,
         match_score: p.score,
         ai_reasoning: p.reasoning,
@@ -87,7 +96,26 @@ export async function POST(request: NextRequest) {
   );
 
   // Update job status to offer_sent
-  await adminClient.from("jobs").update({ status: "offer_sent" }).eq("id", job_id);
+  await adminClient.from("jobs").update({ status: "offer_sent" }).eq("id", job_id).eq("tenant_id", tenantId);
+
+  await emitEvent(adminClient, {
+    type: "job_state_changed",
+    source: "api.admin.dispatch",
+    entityType: "job",
+    entityId: job_id,
+    actorId: user.id,
+    tenantId,
+    dedupKey: `job_state_changed:${job_id}:offer_sent`,
+    payload: {
+      job_id,
+      tenant_id: tenantId,
+      from_status: job.status,
+      to_status: "offer_sent",
+      actor_role: "admin",
+      category: job.category,
+      title: job.title,
+    },
+  });
 
   await Promise.all(
     topProviders.map(async (p) => {
@@ -95,11 +123,31 @@ export async function POST(request: NextRequest) {
       if (provider?.user_id) {
         await createInAppNotification(adminClient, {
           userId: provider.user_id,
+          tenantId,
           title: "New job offer",
           body: `A ${job.category} job is available in ${job.city ?? "your area"}.`,
           data: { job_id, provider_id: p.provider_id },
         });
       }
+      await emitEvent(adminClient, {
+        type: "provider_offer_sent",
+        source: "api.admin.dispatch",
+        entityType: "job",
+        entityId: job_id,
+        actorId: user.id,
+        tenantId,
+        dedupKey: `provider_offer_sent:${job_id}:${p.provider_id}`,
+        payload: {
+          job_id,
+          tenant_id: tenantId,
+          provider_id: p.provider_id,
+          match_score: p.score,
+          expires_at: expiresAt,
+          category: job.category,
+          city: job.city,
+          state: job.state,
+        },
+      });
     })
   );
 

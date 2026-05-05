@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { gabriel } from "@/lib/agents/gabriel";
+import { getTenantId } from "@/lib/tenancy";
+import { checkPermission } from "@/lib/access";
 
 export async function POST(
   _request: NextRequest,
@@ -14,13 +16,16 @@ export async function POST(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, tenant_id")
     .eq("id", user.id)
     .single();
 
   if (profile?.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const tenantId = getTenantId(profile);
+  const access = await checkPermission({ tenantId, userId: user.id, object: "providers", action: "approve_provider", route: "/api/admin/providers/[id]/approve" });
+  if (!access.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const adminClient = await createAdminClient();
 
@@ -28,6 +33,7 @@ export async function POST(
     .from("providers")
     .select("*")
     .eq("id", id)
+    .eq("tenant_id", tenantId)
     .single();
 
   if (!provider) return NextResponse.json({ error: "Provider not found" }, { status: 404 });
@@ -49,6 +55,7 @@ export async function POST(
       admin_notes: gabrielCheck?.notes ?? null,
     })
     .eq("id", id)
+    .eq("tenant_id", tenantId)
     .select()
     .single();
 

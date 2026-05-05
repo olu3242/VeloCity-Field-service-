@@ -1,5 +1,5 @@
 // NOVA — Job Workflow Orchestration Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 import type { Job, JobStatus } from "@/types";
 import { hasEnv } from "@/lib/env";
 
@@ -65,7 +65,7 @@ ALWAYS respond with valid JSON for transition analysis:
     job: Partial<Job>,
     toStatus: JobStatus,
     actorRole: "customer" | "provider" | "admin",
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<NovaTransitionOutput | null> {
     if (!hasEnv("ANTHROPIC_API_KEY")) {
       return {
@@ -102,7 +102,7 @@ Is this transition valid? What notifications and automations should trigger? Res
     job: Partial<Job>,
     customerName: string,
     providerName: string,
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<NovaReminderOutput | null> {
     const prompt = `Schedule reminders for:
 Job: ${job.title} (${job.category})

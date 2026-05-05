@@ -1,5 +1,5 @@
 // TESS — Territory & Market Intelligence Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 import type { ServiceCategory } from "@/types";
 
 export interface TessMarketOutput {
@@ -57,7 +57,7 @@ ALWAYS respond with valid JSON.`;
     onlineProviders: number,
     requestsLastHour: number,
     categoryBreakdown: Partial<Record<ServiceCategory, number>>,
-    context: {} = {}
+    context: AgentContext = {}
   ): Promise<TessMarketOutput | null> {
     const prompt = `Market analysis for ${city}, ${state}:
 Active jobs: ${activeJobs}
@@ -80,7 +80,7 @@ Analyze market health and provide recommendations. Respond with JSON.`;
     category: ServiceCategory,
     urgency: "scheduled" | "same_day" | "emergency",
     availableProviderCount: number,
-    context: {} = {}
+    context: AgentContext = {}
   ): Promise<TessServiceabilityOutput | null> {
     const prompt = `Serviceability check:
 ZIP: ${zip}

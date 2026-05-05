@@ -10,6 +10,7 @@ type SupabaseLike = {
 
 export interface NotificationPayload {
   userId: string;
+  tenantId?: string;
   title: string;
   body: string;
   data?: Record<string, unknown>;
@@ -23,6 +24,7 @@ export async function createInAppNotification(
 ) {
   return supabase.from("notifications").insert({
     user_id: payload.userId,
+    tenant_id: payload.tenantId,
     channel: "in_app",
     title: payload.title,
     body: payload.body,

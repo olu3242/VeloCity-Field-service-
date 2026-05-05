@@ -2,10 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { AgentName, AgentResponse } from "@/types";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getEnv } from "@/lib/env";
+import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
 
 export interface AgentContext {
   jobId?: string;
   userId?: string;
+  tenantId?: string;
 }
 
 export abstract class BaseAgent {
@@ -78,11 +80,12 @@ export abstract class BaseAgent {
     return result;
   }
 
-  private async log(context: AgentContext, input: string, output: AgentResponse) {
+  protected async log(context: AgentContext, input: string, output: AgentResponse<unknown>) {
     try {
       const supabase = await createAdminClient();
       await supabase.from("agent_logs").insert({
         agent_name: this.name,
+        tenant_id: context.tenantId ?? DEFAULT_TENANT_ID,
         job_id: context.jobId ?? null,
         user_id: context.userId ?? null,
         action: this.role,

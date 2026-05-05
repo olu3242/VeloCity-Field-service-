@@ -1,87 +1,87 @@
-// VeloCity Automation Engine — Event Emitter
-// Idempotent: dedup_key prevents duplicate events
-
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "@/lib/supabase/admin";
-import type { AutomationEventType, AutomationPayload } from "@/types/automation";
+import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import type { AutomationEventInput, AutomationEventType } from "./types";
 
-export interface EmitResult {
-  eventId: string;
-  queued: boolean;
-  duplicate: boolean;
+type EmitResult = { eventId?: string; queued: boolean; error?: string; duplicate?: boolean };
+
+function isSupabaseClient(value: unknown): value is SupabaseClient {
+  return Boolean(value && typeof value === "object" && "from" in value);
 }
 
 export async function emitEvent(
-  eventType: AutomationEventType,
-  payload: AutomationPayload,
+  supabase: SupabaseClient,
+  input: AutomationEventInput
+): Promise<EmitResult>;
+export async function emitEvent(
+  eventType: AutomationEventType | string,
+  payload: unknown,
   dedupKey?: string
+): Promise<EmitResult>;
+export async function emitEvent(
+  first: SupabaseClient | AutomationEventType | string,
+  second: AutomationEventInput | unknown,
+  third?: string
 ): Promise<EmitResult> {
-  const db = getAdminClient();
-  const now = new Date().toISOString();
+  const supabase = isSupabaseClient(first) ? first : getAdminClient();
+  const input: AutomationEventInput = isSupabaseClient(first)
+    ? second as AutomationEventInput
+    : {
+        type: first as AutomationEventType,
+        source: "app",
+        payload: second as Record<string, unknown>,
+        dedupKey: third,
+      };
 
-  // ── 1. Deduplication check ───────────────────────────────
-  if (dedupKey) {
-    const { data: existing } = await db
+  const payload = input.payload ?? {};
+  const tenantId = input.tenantId ?? (typeof payload.tenant_id === "string" ? payload.tenant_id : DEFAULT_TENANT_ID);
+
+  if (input.dedupKey) {
+    const { data: existing } = await supabase
       .from("automation_events")
       .select("id")
-      .eq("dedup_key", dedupKey)
+      .eq("dedup_key", input.dedupKey)
       .maybeSingle();
-
-    if (existing) {
-      return { eventId: existing.id, queued: false, duplicate: true };
-    }
+    if (existing?.id) return { eventId: existing.id, queued: false, duplicate: true };
   }
 
-  // ── 2. Persist event ─────────────────────────────────────
-  const { data: event, error: eventError } = await db
+  const { data: event, error: eventError } = await supabase
     .from("automation_events")
     .insert({
-      event_type: eventType,
-      payload: payload as Record<string, unknown>,
-      dedup_key: dedupKey ?? null,
-      status: "received",
+      tenant_id: tenantId,
+      event_type: input.type,
+      source: input.source ?? "app",
+      entity_type: input.entityType ?? null,
+      entity_id: input.entityId ?? null,
+      actor_id: input.actorId ?? null,
+      payload,
+      dedup_key: input.dedupKey ?? null,
     })
     .select("id")
     .single();
 
-  if (eventError || !event) {
-    throw new Error(`Failed to emit event ${eventType}: ${eventError?.message}`);
+  if (eventError) {
+    return { queued: false, error: eventError.message };
   }
 
-  // ── 3. Enqueue for processing ────────────────────────────
-  const { error: queueError } = await db.from("automation_queue").insert({
+  const { error: queueError } = await supabase.from("automation_queue").insert({
+    tenant_id: tenantId,
     event_id: event.id,
-    event_type: eventType,
-    payload: payload as Record<string, unknown>,
+    event_type: input.type,
+    payload: { ...payload, tenant_id: tenantId },
+    dedup_key: input.dedupKey ?? null,
     status: "pending",
-    retry_count: 0,
-    max_retries: 3,
-    next_retry_at: now,
-    dedup_key: dedupKey ?? null,
   });
 
   if (queueError) {
-    // Non-fatal — event is recorded, queue insertion failed
-    console.error(`[emitEvent] Queue insert failed for ${eventType}:`, queueError.message);
-    return { eventId: event.id, queued: false, duplicate: false };
+    return { eventId: event.id, queued: false, error: queueError.message };
   }
-
-  // ── 4. Audit log ─────────────────────────────────────────
-  await db.from("audit_logs").insert({
-    actor_type: "system",
-    action: "event_emitted",
-    resource: "automation_events",
-    resource_id: event.id,
-    payload: { event_type: eventType, dedup_key: dedupKey ?? null },
-  }).then(() => {/* non-blocking */});
 
   return { eventId: event.id, queued: true, duplicate: false };
 }
 
-// Convenience: emit multiple events atomically (best-effort)
 export async function emitEvents(
-  events: Array<{ type: AutomationEventType; payload: AutomationPayload; dedupKey?: string }>
+  events: Array<{ type: AutomationEventType; payload: Record<string, unknown>; dedupKey?: string }>
 ): Promise<void> {
-  await Promise.allSettled(
-    events.map(({ type, payload, dedupKey }) => emitEvent(type, payload, dedupKey))
-  );
+  await Promise.allSettled(events.map(({ type, payload, dedupKey }) => emitEvent(type, payload, dedupKey)));
 }

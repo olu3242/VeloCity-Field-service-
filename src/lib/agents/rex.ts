@@ -1,5 +1,5 @@
 // REX — Quality, Trust & Risk Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 import type { Provider, Review } from "@/types";
 
 export interface RexTrustOutput {
@@ -52,7 +52,7 @@ ALWAYS respond with valid JSON.`;
     recentReviews: Partial<Review>[],
     recentDisputes: number,
     cancellationRate: number,
-    context: { userId?: string } = {}
+    context: AgentContext = {}
   ): Promise<RexTrustOutput | null> {
     const avgRating =
       recentReviews.length > 0
@@ -84,7 +84,7 @@ Calculate updated trust score and risk assessment. Respond with JSON.`;
     rating: number,
     comment: string,
     jobContext: string,
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<RexReviewAnalysis | null> {
     const prompt = `Analyze this review for authenticity and sentiment:
 Rating: ${rating}/5

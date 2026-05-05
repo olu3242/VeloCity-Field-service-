@@ -16,6 +16,7 @@ export type EnvKey =
   | "TWILIO_PHONE_NUMBER"
   | "SENDGRID_API_KEY"
   | "NEXT_PUBLIC_APP_URL"
+  | "CRON_SECRET"
   | "NEXTAUTH_SECRET";
 
 export const ENV_DESCRIPTIONS: Record<EnvKey, string> = {
@@ -34,6 +35,7 @@ export const ENV_DESCRIPTIONS: Record<EnvKey, string> = {
   TWILIO_PHONE_NUMBER: "Twilio sender phone number for SMS notifications.",
   SENDGRID_API_KEY: "SendGrid API key for transactional email notifications.",
   NEXT_PUBLIC_APP_URL: "Canonical app URL used for redirects and webhooks.",
+  CRON_SECRET: "Server-only shared secret used to protect scheduled cron routes.",
   NEXTAUTH_SECRET: "Auth secret used by NextAuth-compatible flows; at least 32 characters.",
 };
 
@@ -47,6 +49,7 @@ export const REQUIRED_ENV_BY_AREA: Record<string, EnvKey[]> = {
   oauth: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "NEXTAUTH_SECRET"],
   sms: ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER"],
   email: ["SENDGRID_API_KEY"],
+  cron: ["CRON_SECRET"],
 };
 
 export function isConfiguredValue(value: string | undefined): value is string {
