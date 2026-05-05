@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { offerActionSchema, validationError } from "@/lib/validation";
 
 export async function POST(
   request: NextRequest,
@@ -10,7 +11,11 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { action, reason } = await request.json() as { action: "accept" | "reject"; reason?: string };
+  const parsed = offerActionSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed.error), { status: 400 });
+  }
+  const { action, reason } = parsed.data;
 
   const { data: provider } = await supabase
     .from("providers")
@@ -46,6 +51,9 @@ export async function POST(
       .neq("id", id)
       .is("rejected_at", null);
   } else {
+    if (!reason) {
+      return NextResponse.json({ error: "Reason required when rejecting an offer" }, { status: 400 });
+    }
     await supabase.from("provider_offers").update({
       rejected_at: now,
       rejection_reason: reason ?? null,

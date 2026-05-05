@@ -40,7 +40,7 @@ export default function SubmitQuotePage() {
         line[field] = raw;
       }
       line.total_cents = (line.quantity as number) * (line.unit_price_cents as number);
-      next[i] = line as QuoteLineItem;
+      next[i] = line as unknown as QuoteLineItem;
       return next;
     });
   }

@@ -1,6 +1,7 @@
 // MAX — Dispatch & Provider Matching Agent
 import { BaseAgent } from "./base";
 import type { Provider, Job } from "@/types";
+import { hasEnv } from "@/lib/env";
 
 export interface MatchScore {
   provider_id: string;
@@ -54,6 +55,10 @@ ALWAYS respond with valid JSON:
     providers: Partial<Provider>[],
     context: { jobId?: string } = {}
   ): Promise<MaxOutput | null> {
+    if (!hasEnv("ANTHROPIC_API_KEY")) {
+      return fallbackMatch(providers);
+    }
+
     const prompt = `Job to dispatch:
 Category: ${job.category}
 Urgency: ${job.urgency}
@@ -76,3 +81,24 @@ Rank providers and determine dispatch strategy. Respond with JSON.`;
 }
 
 export const max = new MaxAgent();
+
+function fallbackMatch(providers: Partial<Provider>[]): MaxOutput {
+  const ranked = providers
+    .map((provider) => ({
+      provider_id: provider.id ?? "",
+      score: Math.max(0.1, Math.min(0.99, Number(provider.trust_score ?? 0.5))),
+      reasoning: "Fallback match based on category eligibility, online status, and trust score.",
+      eta_minutes: 30,
+      recommended: true,
+    }))
+    .filter((provider) => provider.provider_id)
+    .sort((a, b) => b.score - a.score);
+
+  return {
+    ranked_providers: ranked,
+    dispatch_strategy: ranked.length > 1 ? "broadcast" : "immediate",
+    offer_expiry_minutes: 15,
+    reasoning: "AI dispatch key is not configured; using deterministic provider ranking.",
+    sla_risk: ranked.length ? "low" : "high",
+  };
+}

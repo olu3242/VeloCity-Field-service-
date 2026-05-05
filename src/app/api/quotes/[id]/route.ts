@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { quoteActionSchema, validationError } from "@/lib/validation";
 
 export async function POST(
   request: NextRequest,
@@ -10,7 +11,11 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { action, reason } = await request.json() as { action: "approve" | "reject"; reason?: string };
+  const parsed = quoteActionSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed.error), { status: 400 });
+  }
+  const { action, reason } = parsed.data;
 
   const { data: quote } = await supabase
     .from("quotes")
@@ -34,6 +39,9 @@ export async function POST(
       quoted_cost_cents: quote.total_cents,
     }).eq("id", quote.job_id);
   } else {
+    if (!reason) {
+      return NextResponse.json({ error: "Reason required when rejecting a quote" }, { status: 400 });
+    }
     await supabase.from("quotes").update({ rejected_at: now }).eq("id", id);
     await supabase.from("jobs").update({
       status: quote.is_change_order ? "in_progress" : "cancelled",

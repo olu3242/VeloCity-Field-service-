@@ -1,18 +1,27 @@
 import Stripe from "stripe";
 import { loadStripe } from "@stripe/stripe-js";
+import { getEnv, requireEnv } from "@/lib/env";
 import { calculatePlatformFee } from "@/lib/utils";
 
 // Server-side Stripe instance
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2025-03-31.basil",
-  typescript: true,
-});
+let stripeClient: Stripe | null = null;
+
+export function getStripeServer() {
+  if (!stripeClient) {
+    stripeClient = new Stripe(requireEnv("STRIPE_SECRET_KEY"), {
+      apiVersion: "2024-04-10",
+      typescript: true,
+    });
+  }
+  return stripeClient;
+}
 
 // Client-side Stripe promise (lazy-loaded)
 let stripePromise: ReturnType<typeof loadStripe> | null = null;
 export function getStripe() {
   if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+    const publishableKey = getEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
+    stripePromise = publishableKey ? loadStripe(publishableKey) : Promise.resolve(null);
   }
   return stripePromise;
 }
@@ -30,7 +39,7 @@ export async function createPaymentIntent(
 ): Promise<Stripe.PaymentIntent> {
   const platformFee = calculatePlatformFee(amountCents);
 
-  return stripe.paymentIntents.create({
+  return getStripeServer().paymentIntents.create({
     amount: amountCents,
     currency: "usd",
     customer: stripeCustomerId,
@@ -53,7 +62,7 @@ export async function createConnectedAccount(
   email: string,
   providerId: string
 ): Promise<Stripe.Account> {
-  return stripe.accounts.create({
+  return getStripeServer().accounts.create({
     type: "express",
     email,
     metadata: { provider_id: providerId },
@@ -70,7 +79,7 @@ export async function createAccountLink(
   returnUrl: string,
   refreshUrl: string
 ): Promise<Stripe.AccountLink> {
-  return stripe.accountLinks.create({
+  return getStripeServer().accountLinks.create({
     account: accountId,
     return_url: returnUrl,
     refresh_url: refreshUrl,
@@ -87,7 +96,7 @@ export async function transferToProvider(
   const platformFee = calculatePlatformFee(amountCents);
   const providerPayout = amountCents - platformFee;
 
-  return stripe.transfers.create({
+  return getStripeServer().transfers.create({
     amount: providerPayout,
     currency: "usd",
     destination: stripeAccountId,
@@ -108,7 +117,7 @@ export async function createRefund(
   amountCents: number,
   reason: "duplicate" | "fraudulent" | "requested_by_customer"
 ): Promise<Stripe.Refund> {
-  return stripe.refunds.create({
+  return getStripeServer().refunds.create({
     payment_intent: paymentIntentId,
     amount: amountCents,
     reason,
@@ -124,7 +133,7 @@ export async function createSubscription(
   priceId: string,
   metadata: Record<string, string>
 ): Promise<Stripe.Subscription> {
-  return stripe.subscriptions.create({
+  return getStripeServer().subscriptions.create({
     customer: stripeCustomerId,
     items: [{ price: priceId }],
     metadata,
@@ -135,7 +144,7 @@ export async function createSubscription(
 }
 
 export async function cancelSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
-  return stripe.subscriptions.cancel(subscriptionId);
+  return getStripeServer().subscriptions.cancel(subscriptionId);
 }
 
 // ============================================================
@@ -146,9 +155,9 @@ export function constructWebhookEvent(
   payload: string | Buffer,
   signature: string
 ): Stripe.Event {
-  return stripe.webhooks.constructEvent(
+  return getStripeServer().webhooks.constructEvent(
     payload,
     signature,
-    process.env.STRIPE_WEBHOOK_SECRET!
+    requireEnv("STRIPE_WEBHOOK_SECRET")
   );
 }

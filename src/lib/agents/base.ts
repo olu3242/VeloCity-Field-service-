@@ -1,10 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AgentName, AgentResponse } from "@/types";
 import { createAdminClient } from "@/lib/supabase/server";
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-});
+import { getEnv } from "@/lib/env";
 
 export interface AgentContext {
   jobId?: string;
@@ -16,7 +13,18 @@ export abstract class BaseAgent {
   abstract role: string;
   abstract systemPrompt: string;
 
-  protected client = anthropic;
+  private client: Anthropic | null = null;
+
+  protected getFallback<T = Record<string, unknown>>(_userMessage: string): T | null {
+    return null;
+  }
+
+  private getClient() {
+    const apiKey = getEnv("ANTHROPIC_API_KEY");
+    if (!apiKey) return null;
+    if (!this.client) this.client = new Anthropic({ apiKey });
+    return this.client;
+  }
 
   async run<T = Record<string, unknown>>(
     userMessage: string,
@@ -27,8 +35,22 @@ export abstract class BaseAgent {
     let result: AgentResponse<T>;
 
     try {
-      const response = await this.client.messages.create({
-        model: "claude-sonnet-4-6",
+      const client = this.getClient();
+      if (!client) {
+        const fallback = this.getFallback<T>(userMessage);
+        result = {
+          success: true,
+          data: fallback ?? ({ fallback: true, message: "AI key not configured" } as T),
+          tokensUsed,
+          latencyMs: Date.now() - start,
+        };
+        await this.log(context, userMessage, result as AgentResponse);
+        return result;
+      }
+
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        temperature: 0.2,
         max_tokens: 2048,
         system: this.systemPrompt,
         messages: [{ role: "user", content: userMessage }],
@@ -52,7 +74,7 @@ export abstract class BaseAgent {
       result = { success: false, error: err, tokensUsed, latencyMs: Date.now() - start };
     }
 
-    await this.log(context, userMessage, result);
+    await this.log(context, userMessage, result as AgentResponse);
     return result;
   }
 
@@ -65,7 +87,7 @@ export abstract class BaseAgent {
         user_id: context.userId ?? null,
         action: this.role,
         input: { message: input },
-        output: output as Record<string, unknown>,
+        output: output as unknown as Record<string, unknown>,
         tokens_used: output.tokensUsed ?? null,
         latency_ms: output.latencyMs ?? null,
         error: output.error ?? null,

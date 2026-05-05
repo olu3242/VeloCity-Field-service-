@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { constructWebhookEvent, stripe, transferToProvider } from "@/lib/stripe/client";
+import { constructWebhookEvent } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/server";
 import { calculatePlatformFee } from "@/lib/utils";
+import { hasEnvGroup } from "@/lib/env";
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
+
+  if (!hasEnvGroup("stripe")) {
+    return NextResponse.json({ received: true, mode: "stripe-not-configured" });
+  }
 
   if (!signature) {
     return NextResponse.json({ error: "No signature" }, { status: 400 });

@@ -89,6 +89,7 @@ export type NotificationChannel = "sms" | "email" | "push" | "in_app";
 
 export interface Profile {
   id: string;
+  tenant_id: string;
   role: UserRole;
   full_name: string | null;
   phone: string | null;
@@ -101,6 +102,7 @@ export interface Profile {
 
 export interface Provider {
   id: string;
+  tenant_id: string;
   user_id: string;
   business_name: string;
   business_license: string | null;
@@ -139,6 +141,7 @@ export interface ProviderDocument {
 
 export interface CustomerAddress {
   id: string;
+  tenant_id: string;
   customer_id: string;
   label: string;
   street: string;
@@ -154,6 +157,7 @@ export interface CustomerAddress {
 
 export interface Job {
   id: string;
+  tenant_id: string;
   customer_id: string;
   provider_id: string | null;
   category: ServiceCategory;
@@ -210,6 +214,7 @@ export interface AIClassification {
 
 export interface JobStatusHistory {
   id: string;
+  tenant_id: string;
   job_id: string;
   from_status: JobStatus | null;
   to_status: JobStatus;
@@ -222,6 +227,7 @@ export interface JobStatusHistory {
 
 export interface Quote {
   id: string;
+  tenant_id: string;
   job_id: string;
   provider_id: string;
   is_change_order: boolean;
@@ -248,6 +254,7 @@ export interface QuoteLineItem {
 
 export interface Payment {
   id: string;
+  tenant_id: string;
   job_id: string;
   customer_id: string;
   provider_id: string | null;
@@ -268,6 +275,7 @@ export interface Payment {
 
 export interface Review {
   id: string;
+  tenant_id: string;
   job_id: string;
   reviewer_id: string;
   reviewee_id: string;
@@ -281,6 +289,7 @@ export interface Review {
 
 export interface Dispute {
   id: string;
+  tenant_id: string;
   job_id: string;
   initiated_by: string;
   against: string;
@@ -306,6 +315,7 @@ export interface AIDisputeRecommendation {
 
 export interface ProviderOffer {
   id: string;
+  tenant_id: string;
   job_id: string;
   provider_id: string;
   match_score: number | null;
@@ -320,6 +330,7 @@ export interface ProviderOffer {
 
 export interface Subscription {
   id: string;
+  tenant_id: string;
   customer_id: string;
   provider_id: string | null;
   stripe_subscription_id: string | null;
@@ -336,6 +347,7 @@ export interface Subscription {
 
 export interface Notification {
   id: string;
+  tenant_id: string;
   user_id: string;
   channel: NotificationChannel;
   title: string;
@@ -349,6 +361,7 @@ export interface Notification {
 
 export interface ServiceArea {
   id: string;
+  tenant_id: string;
   name: string;
   city: string;
   state: string;
@@ -375,6 +388,7 @@ export type AgentName =
 
 export interface AgentLog {
   id: string;
+  tenant_id: string;
   agent_name: AgentName;
   job_id: string | null;
   user_id: string | null;
@@ -385,6 +399,16 @@ export interface AgentLog {
   latency_ms: number | null;
   error: string | null;
   created_at: string;
+}
+
+export interface Tenant {
+  id: string;
+  slug: string;
+  name: string;
+  status: "active" | "suspended" | string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface AgentResponse<T = Record<string, unknown>> {

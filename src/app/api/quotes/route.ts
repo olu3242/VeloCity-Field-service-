@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { quinn } from "@/lib/agents/quinn";
+import { createQuoteSchema, validationError } from "@/lib/validation";
 import type { QuoteLineItem, ServiceCategory, UrgencyLevel } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -9,13 +10,11 @@ export async function POST(request: NextRequest) {
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json() as {
-    job_id: string;
-    line_items: QuoteLineItem[];
-    notes?: string;
-    is_change_order?: boolean;
-    parent_quote_id?: string;
-  };
+  const parsed = createQuoteSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed.error), { status: 400 });
+  }
+  const body = parsed.data;
 
   // Get job for context
   const { data: job } = await supabase
@@ -37,14 +36,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const subtotal = body.line_items.reduce((sum, li) => sum + li.total_cents, 0);
+  const lineItems = body.line_items as QuoteLineItem[];
+  const subtotal = lineItems.reduce((sum, li) => sum + li.total_cents, 0);
   const tax = Math.round(subtotal * 0.0825);
   const total = subtotal + tax;
   const deposit = Math.round(total * 0.3);
 
   // QUINN reviews the quote for fairness
   const quinnReview = await quinn.reviewQuote(
-    body.line_items,
+    lineItems,
     job.category as ServiceCategory,
     job.urgency as UrgencyLevel,
     job.city ?? "",
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       provider_id: provider.id,
       is_change_order: body.is_change_order ?? false,
       parent_quote_id: body.parent_quote_id ?? null,
-      line_items: body.line_items,
+      line_items: lineItems,
       subtotal_cents: subtotal,
       tax_cents: tax,
       total_cents: total,

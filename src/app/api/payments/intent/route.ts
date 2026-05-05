@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createPaymentIntent } from "@/lib/stripe/client";
+import { hasEnvGroup } from "@/lib/env";
+import { paymentIntentSchema, validationError } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -8,11 +10,11 @@ export async function POST(request: NextRequest) {
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { job_id, amount_cents, type } = await request.json() as {
-    job_id: string;
-    amount_cents: number;
-    type: "deposit" | "final";
-  };
+  const parsed = paymentIntentSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(validationError(parsed.error), { status: 400 });
+  }
+  const { job_id, amount_cents, type } = parsed.data;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -20,13 +22,18 @@ export async function POST(request: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  const intent = await createPaymentIntent(
-    amount_cents,
-    user.id,
-    job_id,
-    type,
-    profile?.stripe_customer_id ?? undefined
-  );
+  const intent = hasEnvGroup("stripe")
+    ? await createPaymentIntent(
+        amount_cents,
+        user.id,
+        job_id,
+        type,
+        profile?.stripe_customer_id ?? undefined
+      )
+    : {
+        id: `local_pi_${crypto.randomUUID()}`,
+        client_secret: `local_secret_${crypto.randomUUID()}`,
+      };
 
   // Record payment intent in DB
   await supabase.from("payments").insert({
@@ -42,5 +49,8 @@ export async function POST(request: NextRequest) {
     metadata: {},
   });
 
-  return NextResponse.json({ client_secret: intent.client_secret });
+  return NextResponse.json({
+    client_secret: intent.client_secret,
+    mode: hasEnvGroup("stripe") ? "stripe" : "local-dev",
+  });
 }
