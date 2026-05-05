@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VeloCity Field Service — Architecture Diagram</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=Space+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --black: #0a0a0f; --carbon: #111118; --graphite: #1a1a24;
+      --slate: #252533; --border: #2e2e3e; --volt: #c8f135;
+      --amber: #f5a623; --ice: #7ec8e3; --red: #f56565;
+      --white: #f4f4f0; --muted: #8888a0;
+      --font-display: 'Bebas Neue', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--black); color: var(--white); font-family: var(--font-body); padding: 40px; min-height: 100vh; }
+    h1 { font-family: var(--font-display); font-size: 32px; letter-spacing: 2px; margin-bottom: 8px; }
+    h1 em { color: var(--volt); font-style: normal; }
+    .subtitle { font-family: var(--font-mono); font-size: 11px; color: var(--muted); letter-spacing: 1px; margin-bottom: 40px; }
+
+    .legend { display: flex; gap: 24px; margin-bottom: 32px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+    .arch-canvas { position: relative; width: 100%; overflow-x: auto; }
+
+    /* Layer containers */
+    .layer {
+      border: 1px solid var(--border); border-radius: 8px;
+      margin-bottom: 20px; overflow: visible; position: relative;
+    }
+    .layer-label {
+      font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.5px;
+      padding: 8px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .layer-body { padding: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+    /* Nodes */
+    .node {
+      border-radius: 6px; padding: 12px 16px;
+      font-size: 12px; font-weight: 500; position: relative;
+      cursor: default; transition: transform 0.2s, box-shadow 0.2s;
+      min-width: 120px; text-align: center;
+    }
+    .node:hover { transform: translateY(-2px); }
+    .node .node-label { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+    .node .node-sub { font-size: 10px; opacity: 0.7; font-family: var(--font-mono); }
+
+    /* Color variants */
+    .n-client { background: rgba(126,200,227,0.1); border: 1px solid rgba(126,200,227,0.3); color: var(--ice); }
+    .n-infra  { background: rgba(200,241,53,0.08); border: 1px solid rgba(200,241,53,0.25); color: var(--volt); }
+    .n-db     { background: rgba(245,166,35,0.1);  border: 1px solid rgba(245,166,35,0.3);  color: var(--amber); }
+    .n-ai     { background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.3); color: #a78bfa; }
+    .n-ext    { background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.25); color: #4ade80; }
+    .n-admin  { background: rgba(245,101,101,0.1); border: 1px solid rgba(245,101,101,0.3); color: var(--red); }
+
+    /* Agent grid */
+    .agents-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 8px; width: 100%;
+    }
+    .agent-node {
+      background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.2);
+      border-radius: 6px; padding: 10px; text-align: center;
+      font-size: 11px; color: #c4b5fd; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .agent-node:hover { background: rgba(167,139,250,0.18); border-color: rgba(167,139,250,0.5); transform: translateY(-1px); }
+    .agent-node .agent-name { font-weight: 700; font-size: 13px; margin-bottom: 2px; color: #a78bfa; }
+    .agent-node .agent-role { font-family: var(--font-mono); font-size: 9px; color: var(--muted); }
+
+    /* Arrows between layers */
+    .arrow-row {
+      display: flex; justify-content: center; align-items: center;
+      gap: 8px; margin: -8px 0; position: relative; z-index: 10;
+    }
+    .arrow-label {
+      font-family: var(--font-mono); font-size: 10px; color: var(--muted);
+      background: var(--black); padding: 2px 8px; border: 1px solid var(--border);
+      border-radius: 2px;
+    }
+
+    /* Connector SVG */
+    .connectors { position: relative; height: 32px; overflow: visible; margin: 4px 0; }
+    .connector-svg { width: 100%; height: 32px; }
+    .connector-line { stroke: var(--border); stroke-width: 1.5; fill: none; marker-end: url(#arr); stroke-dasharray: 4 3; }
+
+    /* Status machine */
+    .status-machine { display: flex; flex-wrap: wrap; gap: 8px; padding: 20px; }
+    .status-pill {
+      padding: 4px 12px; border-radius: 20px; font-size: 11px;
+      font-family: var(--font-mono); border: 1px solid;
+    }
+    .sp-pre  { background: rgba(148,163,184,0.1); border-color: rgba(148,163,184,0.3); color: #94a3b8; }
+    .sp-match { background: rgba(126,200,227,0.1); border-color: rgba(126,200,227,0.3); color: var(--ice); }
+    .sp-work { background: rgba(200,241,53,0.08); border-color: rgba(200,241,53,0.25); color: var(--volt); }
+    .sp-pay  { background: rgba(245,166,35,0.1); border-color: rgba(245,166,35,0.3); color: var(--amber); }
+    .sp-done { background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.25); color: #4ade80; }
+    .sp-err  { background: rgba(245,101,101,0.1); border-color: rgba(245,101,101,0.3); color: var(--red); }
+
+    .section-head { font-family: var(--font-display); font-size: 20px; letter-spacing: 1px; margin: 32px 0 16px; }
+    .section-head em { color: var(--volt); font-style: normal; }
+
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    /* DB Schema section */
+    .db-table { background: var(--graphite); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; }
+    .db-table-name { padding: 8px 14px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 12px; color: var(--amber); font-family: var(--font-mono); }
+    .db-cols { padding: 8px 14px; font-size: 11px; color: var(--muted); font-family: var(--font-mono); display: flex; flex-wrap: wrap; gap: 4px 16px; }
+    .db-pk { color: var(--volt); }
+    .db-fk { color: var(--ice); }
+
+    @media (max-width: 768px) {
+      body { padding: 20px; }
+      .agents-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-col { grid-template-columns: 1fr; }
+      .layer-body { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>VELO<em>CITY</em> FIELD SERVICE</h1>
+<div class="subtitle">// SYSTEM ARCHITECTURE · V1.0 MVP · ZENITH AI</div>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background: rgba(126,200,227,0.4)"></div>Client Interfaces</div>
+  <div class="legend-item"><div class="legend-dot" style="background: rgba(200,241,53,0.4)"></div>Platform Core</div>
+  <div class="legend-item"><div class="legend-dot" style="background: rgba(245,166,35,0.4)"></div>Data Layer</div>
+  <div class="legend-item"><div class="legend-dot" style="background: rgba(167,139,250,0.4)"></div>AI OS (Agents)</div>
+  <div class="legend-item"><div class="legend-dot" style="background: rgba(74,222,128,0.3)"></div>External Services</div>
+  <div class="legend-item"><div class="legend-dot" style="background: rgba(245,101,101,0.3)"></div>Admin / Ops</div>
+</div>
+
+<!-- LAYER 1: CLIENT INTERFACES -->
+<div class="layer" style="border-color: rgba(126,200,227,0.2);">
+  <div class="layer-label" style="color: var(--ice);">
+    <span>▸</span> LAYER 1 — CLIENT INTERFACES
+  </div>
+  <div class="layer-body">
+    <div class="node n-client">
+      <div class="node-label">📱 Customer App</div>
+      <div class="node-sub">Next.js · Mobile Web</div>
+    </div>
+    <div class="node n-client">
+      <div class="node-label">🔧 Provider Portal</div>
+      <div class="node-sub">Next.js · PWA</div>
+    </div>
+    <div class="node n-admin">
+      <div class="node-label">🖥 Admin Dashboard</div>
+      <div class="node-sub">Next.js · Ops Center</div>
+    </div>
+    <div class="node n-client" style="opacity:0.5;">
+      <div class="node-label">📲 Mobile App</div>
+      <div class="node-sub">React Native · v2</div>
+    </div>
+  </div>
+</div>
+
+<!-- ARROW -->
+<div class="arrow-row">
+  <div class="arrow-label">HTTP · WebSocket · REST API</div>
+</div>
+
+<!-- LAYER 2: PLATFORM CORE -->
+<div class="layer" style="border-color: rgba(200,241,53,0.2);">
+  <div class="layer-label" style="color: var(--volt);">
+    <span>▸</span> LAYER 2 — PLATFORM CORE (Next.js App Router)
+  </div>
+  <div class="layer-body">
+    <div class="node n-infra">
+      <div class="node-label">🏠 Booking Flow</div>
+      <div class="node-sub">Search · Select · Book</div>
+    </div>
+    <div class="node n-infra">
+      <div class="node-label">📡 Job Manager</div>
+      <div class="node-sub">Status Machine · Events</div>
+    </div>
+    <div class="node n-infra">
+      <div class="node-label">💰 Quote Engine</div>
+      <div class="node-sub">Quotes · Change Orders</div>
+    </div>
+    <div class="node n-infra">
+      <div class="node-label">💳 Payment Core</div>
+      <div class="node-sub">Stripe Connect · Escrow</div>
+    </div>
+    <div class="node n-infra">
+      <div class="node-label">⚖️ Dispute System</div>
+      <div class="node-sub">Evidence · Mediation</div>
+    </div>
+    <div class="node n-infra">
+      <div class="node-label">🔔 Notifications</div>
+      <div class="node-sub">SMS · Email · Push</div>
+    </div>
+    <div class="node n-infra">
+      <div class="node-label">🗺 Maps & Geo</div>
+      <div class="node-sub">Google Maps · Area Mgmt</div>
+    </div>
+    <div class="node n-infra">
+      <div class="node-label">🤖 Agent Router</div>
+      <div class="node-sub">Agent API · V·OS Gateway</div>
+    </div>
+  </div>
+</div>
+
+<!-- ARROW -->
+<div class="arrow-row">
+  <div class="arrow-label">Supabase Client · Service Role · Edge Functions</div>
+</div>
+
+<!-- LAYER 3: DATA LAYER -->
+<div class="layer" style="border-color: rgba(245,166,35,0.2);">
+  <div class="layer-label" style="color: var(--amber);">
+    <span>▸</span> LAYER 3 — DATA LAYER (Supabase / PostgreSQL)
+  </div>
+  <div class="layer-body">
+    <div class="node n-db">
+      <div class="node-label">🗄 PostgreSQL DB</div>
+      <div class="node-sub">40+ Tables · RLS</div>
+    </div>
+    <div class="node n-db">
+      <div class="node-label">⚡ Realtime</div>
+      <div class="node-sub">Job Status · Tracking</div>
+    </div>
+    <div class="node n-db">
+      <div class="node-label">🗃 Storage</div>
+      <div class="node-sub">Photos · Documents</div>
+    </div>
+    <div class="node n-db">
+      <div class="node-label">🔐 Auth</div>
+      <div class="node-sub">OAuth · JWT · RLS</div>
+    </div>
+    <div class="node n-db">
+      <div class="node-label">⚙️ Edge Functions</div>
+      <div class="node-sub">Automation · Webhooks</div>
+    </div>
+    <div class="node n-db">
+      <div class="node-label">📜 Audit Log</div>
+      <div class="node-sub">All Events · Governance</div>
+    </div>
+  </div>
+</div>
+
+<!-- ARROW -->
+<div class="arrow-row">
+  <div class="arrow-label">Anthropic API · claude-sonnet-4 · T=0.2</div>
+</div>
+
+<!-- LAYER 4: AI OS -->
+<div class="layer" style="border-color: rgba(167,139,250,0.3);">
+  <div class="layer-label" style="color: #a78bfa;">
+    <span>▸</span> LAYER 4 — AI OS · V·OS (10 Specialized Agents)
+  </div>
+  <div class="layer-body" style="flex-direction: column;">
+    <div class="agents-grid">
+      <div class="agent-node">
+        <div class="agent-name">ALICE</div>
+        <div class="agent-role">Intake Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">MAX</div>
+        <div class="agent-role">Dispatch Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">QUINN</div>
+        <div class="agent-role">Quote Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">NOVA</div>
+        <div class="agent-role">Workflow Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">REX</div>
+        <div class="agent-role">Quality Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">IVY</div>
+        <div class="agent-role">Dispute Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">FINN</div>
+        <div class="agent-role">Finance Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">LENA</div>
+        <div class="agent-role">Retention Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">TESS</div>
+        <div class="agent-role">Territory Agent</div>
+      </div>
+      <div class="agent-node">
+        <div class="agent-name">GABRIEL</div>
+        <div class="agent-role">Governance Agent</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ARROW -->
+<div class="arrow-row">
+  <div class="arrow-label">HTTPS · Webhooks · OAuth</div>
+</div>
+
+<!-- LAYER 5: EXTERNAL SERVICES -->
+<div class="layer" style="border-color: rgba(74,222,128,0.2);">
+  <div class="layer-label" style="color: #4ade80;">
+    <span>▸</span> LAYER 5 — EXTERNAL SERVICES
+  </div>
+  <div class="layer-body">
+    <div class="node n-ext">
+      <div class="node-label">💳 Stripe</div>
+      <div class="node-sub">Connect · Webhooks</div>
+    </div>
+    <div class="node n-ext">
+      <div class="node-label">🗺 Google Maps</div>
+      <div class="node-sub">Geo · Routing</div>
+    </div>
+    <div class="node n-ext">
+      <div class="node-label">📱 Twilio</div>
+      <div class="node-sub">SMS · Voice OTP</div>
+    </div>
+    <div class="node n-ext">
+      <div class="node-label">📧 SendGrid</div>
+      <div class="node-sub">Transactional Email</div>
+    </div>
+    <div class="node n-ext">
+      <div class="node-label">🤖 Anthropic</div>
+      <div class="node-sub">Claude claude-sonnet-4 API</div>
+    </div>
+    <div class="node n-ext">
+      <div class="node-label">🔵 Google OAuth</div>
+      <div class="node-sub">Customer Auth</div>
+    </div>
+    <div class="node n-ext">
+      <div class="node-label">☁️ Vercel</div>
+      <div class="node-sub">Edge Deploy · CDN</div>
+    </div>
+  </div>
+</div>
+
+<!-- JOB STATUS MACHINE -->
+<div class="section-head">JOB STATUS <em>MACHINE</em></div>
+<div class="layer" style="border-color: rgba(200,241,53,0.15);">
+  <div class="layer-label" style="color: var(--volt);">▸ 30-STATE STATUS MACHINE</div>
+  <div class="status-machine">
+    <!-- Pre-match -->
+    <span class="status-pill sp-pre">draft</span>
+    <span class="status-pill sp-pre">submitted</span>
+    <span class="status-pill sp-pre">awaiting_serviceability</span>
+    <span class="status-pill sp-pre">awaiting_match</span>
+    <!-- Matching -->
+    <span class="status-pill sp-match">offer_sent</span>
+    <span class="status-pill sp-match">accepted</span>
+    <span class="status-pill sp-match">scheduled</span>
+    <!-- Payment / Pre-work -->
+    <span class="status-pill sp-pay">deposit_required</span>
+    <span class="status-pill sp-pay">deposit_paid</span>
+    <!-- Active -->
+    <span class="status-pill sp-work">en_route</span>
+    <span class="status-pill sp-work">arrived</span>
+    <span class="status-pill sp-work">diagnosis_in_progress</span>
+    <span class="status-pill sp-work">quote_submitted</span>
+    <span class="status-pill sp-work">awaiting_quote_approval</span>
+    <span class="status-pill sp-work">quote_approved</span>
+    <span class="status-pill sp-work">in_progress</span>
+    <span class="status-pill sp-work">change_order_submitted</span>
+    <span class="status-pill sp-work">awaiting_change_order_approval</span>
+    <span class="status-pill sp-work">paused</span>
+    <!-- Completion -->
+    <span class="status-pill sp-done">completed_pending_confirmation</span>
+    <span class="status-pill sp-done">customer_confirmed</span>
+    <span class="status-pill sp-done">completed</span>
+    <span class="status-pill sp-done">warranty_callback_open</span>
+    <span class="status-pill sp-done">closed</span>
+    <!-- Error / Dispute -->
+    <span class="status-pill sp-err">disputed</span>
+    <span class="status-pill sp-err">refund_pending</span>
+    <span class="status-pill sp-err">cancelled_customer</span>
+    <span class="status-pill sp-err">cancelled_provider</span>
+    <span class="status-pill sp-err">cancelled_system</span>
+    <span class="status-pill sp-err">failed_service</span>
+  </div>
+</div>
+
+<!-- DB SCHEMA -->
+<div class="section-head">KEY <em>DATABASE TABLES</em></div>
+<div class="two-col">
+  <div>
+    <div class="db-table">
+      <div class="db-table-name">jobs</div>
+      <div class="db-cols">
+        <span class="db-pk">id UUID PK</span>
+        <span class="db-fk">customer_id FK</span>
+        <span class="db-fk">provider_id FK</span>
+        <span>status JobStatus</span>
+        <span class="db-fk">service_category_id FK</span>
+        <span>urgency_level</span>
+        <span>address JSONB</span>
+        <span>created_at</span>
+        <span>updated_at</span>
+      </div>
+    </div>
+    <div class="db-table">
+      <div class="db-table-name">quotes</div>
+      <div class="db-cols">
+        <span class="db-pk">id UUID PK</span>
+        <span class="db-fk">job_id FK</span>
+        <span class="db-fk">provider_id FK</span>
+        <span>total_amount DECIMAL</span>
+        <span>status QuoteStatus</span>
+        <span>approved_at TIMESTAMPTZ</span>
+      </div>
+    </div>
+    <div class="db-table">
+      <div class="db-table-name">payments</div>
+      <div class="db-cols">
+        <span class="db-pk">id UUID PK</span>
+        <span class="db-fk">job_id FK</span>
+        <span>stripe_payment_intent_id</span>
+        <span>amount DECIMAL</span>
+        <span>status PaymentStatus</span>
+        <span>captured_at TIMESTAMPTZ</span>
+      </div>
+    </div>
+    <div class="db-table">
+      <div class="db-table-name">provider_profiles</div>
+      <div class="db-cols">
+        <span class="db-pk">id UUID PK</span>
+        <span class="db-fk">user_id FK</span>
+        <span>stripe_account_id</span>
+        <span>trust_score DECIMAL</span>
+        <span>verification_status</span>
+        <span>is_online BOOLEAN</span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="db-table">
+      <div class="db-table-name">ai_agent_runs</div>
+      <div class="db-cols">
+        <span class="db-pk">id UUID PK</span>
+        <span>agent_name VARCHAR</span>
+        <span>input JSONB</span>
+        <span>output JSONB</span>
+        <span>latency_ms INTEGER</span>
+        <span>model VARCHAR</span>
+        <span>admin_review_required BOOLEAN</span>
+        <span>created_at TIMESTAMPTZ</span>
+      </div>
+    </div>
+    <div class="db-table">
+      <div class="db-table-name">disputes</div>
+      <div class="db-cols">
+        <span class="db-pk">id UUID PK</span>
+        <span class="db-fk">job_id FK</span>
+        <span class="db-fk">raised_by FK</span>
+        <span>status DisputeStatus</span>
+        <span>ivy_recommendation JSONB</span>
+        <span>resolution VARCHAR</span>
+        <span>resolved_at TIMESTAMPTZ</span>
+      </div>
+    </div>
+    <div class="db-table">
+      <div class="db-table-name">job_events</div>
+      <div class="db-cols">
+        <span class="db-pk">id UUID PK</span>
+        <span class="db-fk">job_id FK</span>
+        <span>event_type VARCHAR</span>
+        <span>from_status VARCHAR</span>
+        <span>to_status VARCHAR</span>
+        <span class="db-fk">actor_id FK</span>
+        <span>actor_type VARCHAR</span>
+        <span>metadata JSONB</span>
+      </div>
+    </div>
+    <div class="db-table">
+      <div class="db-table-name">trust_scores</div>
+      <div class="db-cols">
+        <span class="db-pk">id UUID PK</span>
+        <span class="db-fk">provider_id FK</span>
+        <span>score DECIMAL</span>
+        <span>rating_avg DECIMAL</span>
+        <span>completion_rate DECIMAL</span>
+        <span>on_time_rate DECIMAL</span>
+        <span>dispute_rate DECIMAL</span>
+        <span>updated_at TIMESTAMPTZ</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 40px; padding: 16px; border: 1px solid var(--border); border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+  <span style="font-family: var(--font-mono); font-size: 11px; color: var(--muted);">© 2026 ZENITH AI · VELOCITY FIELD SERVICE ARCHITECTURE v1.0</span>
+  <span style="font-family: var(--font-mono); font-size: 11px; color: rgba(200,241,53,0.5);">V·OS ACTIVE ●</span>
+</div>
+
+</body>
+</html>
