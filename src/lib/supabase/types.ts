@@ -403,6 +403,25 @@ export interface Database {
         Insert: Omit<Database["public"]["Tables"]["sla_configs"]["Row"], "id" | "created_at">;
         Update: Partial<Database["public"]["Tables"]["sla_configs"]["Insert"]>;
       };
+      provider_tips: {
+        Row: {
+          id: string;
+          job_id: string;
+          customer_id: string;
+          provider_id: string;
+          amount_cents: number;
+          currency: string;
+          note: string | null;
+          payment_status: "pending" | "succeeded" | "failed";
+          stripe_payment_intent_id: string | null;
+          stripe_transfer_id: string | null;
+          idempotency_key: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["provider_tips"]["Row"], "id" | "created_at" | "updated_at">;
+        Update: Partial<Database["public"]["Tables"]["provider_tips"]["Insert"]>;
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

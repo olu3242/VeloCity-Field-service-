@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuoteActions } from "@/components/jobs/quote-actions";
+import { TipProvider } from "@/components/jobs/tip-provider";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -33,7 +34,8 @@ export default async function JobDetailPage({
     .select(`
       *,
       quotes(*),
-      payments(*)
+      payments(*),
+      providers(business_name, trust_score)
     `)
     .eq("id", id)
     .eq("customer_id", user.id)
@@ -212,6 +214,14 @@ export default async function JobDetailPage({
               <Button variant="outline" className="w-full" asChild>
                 <Link href={`/dashboard/jobs/${job.id}/dispute`}>Open Dispute</Link>
               </Button>
+            )}
+
+            {/* Tip provider — shown for completed/confirmed jobs with a provider */}
+            {["completed", "customer_confirmed", "closed"].includes(job.status) && job.provider_id && (
+              <TipProvider
+                jobId={job.id}
+                providerName={(job.providers as Record<string, unknown> | null)?.business_name as string | undefined}
+              />
             )}
           </div>
         </div>

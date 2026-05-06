@@ -41,6 +41,15 @@ export default async function ProviderJobPage({
     .single();
   if (!job) notFound();
 
+  // Check if customer left a tip
+  const { data: tip } = await supabase
+    .from("provider_tips")
+    .select("amount_cents, note, created_at")
+    .eq("job_id", id)
+    .eq("provider_id", provider.id)
+    .eq("payment_status", "succeeded")
+    .maybeSingle();
+
   const progress = getJobProgressPercent(job.status as Job["status"]);
   const transitions = getAvailableTransitions(job.status as Job["status"], "provider");
 
@@ -65,14 +74,21 @@ export default async function ProviderJobPage({
               {JOB_STATUS_LABELS[job.status as Job["status"]]}
             </Badge>
           </div>
-          {job.final_cost_cents && (
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Your earnings</div>
-              <div className="text-2xl font-bold text-green-700">
-                {formatCents(Math.round(job.final_cost_cents * 0.82))}
+          <div className="text-right space-y-1">
+            {job.final_cost_cents && (
+              <>
+                <div className="text-sm text-gray-500">Your earnings</div>
+                <div className="text-2xl font-bold text-green-700">
+                  {formatCents(Math.round(job.final_cost_cents * 0.82))}
+                </div>
+              </>
+            )}
+            {tip && (
+              <div className="mt-2 inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-sm font-medium border border-rose-100">
+                💝 +{formatCents(tip.amount_cents)} tip received
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Progress */}

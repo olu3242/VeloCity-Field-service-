@@ -36,6 +36,7 @@ export default async function AdminDashboard() {
     { count: pendingProviders },
     { data: recentJobs },
     { data: recentProviders },
+    { data: recentTips },
   ] = await Promise.all([
     supabase.from("jobs").select("*", { count: "exact", head: true }),
     supabase.from("jobs").select("*", { count: "exact", head: true })
@@ -45,6 +46,11 @@ export default async function AdminDashboard() {
     supabase.from("jobs").select("*").order("created_at", { ascending: false }).limit(10),
     supabase.from("providers").select("*, profiles!providers_user_id_fkey(full_name)")
       .eq("status", "pending").limit(5),
+    supabase.from("provider_tips")
+      .select("id, job_id, amount_cents, payment_status, note, created_at, providers(business_name), profiles!provider_tips_customer_id_fkey(full_name)")
+      .eq("payment_status", "succeeded")
+      .order("created_at", { ascending: false })
+      .limit(10),
   ]);
 
   return (
@@ -167,6 +173,49 @@ export default async function AdminDashboard() {
             </div>
           </div>
         </div>
+
+        {/* Tips Feed */}
+        {(recentTips?.length ?? 0) > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Recent Tips 💝</h2>
+              <span className="text-sm text-white/40">
+                Total: ${(recentTips?.reduce((s, t) => s + (t.amount_cents as number ?? 0), 0) ?? 0 / 100).toFixed(2)}
+              </span>
+            </div>
+            <div className="grid gap-2">
+              {recentTips?.map((tip) => {
+                const t = tip as Record<string, unknown>;
+                return (
+                  <div key={tip.id} className="bg-white/5 border border-white/10 rounded-lg px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-emerald-400 font-bold">
+                        +${((t.amount_cents as number) / 100).toFixed(2)}
+                      </span>
+                      <div className="text-sm text-white/60">
+                        <span className="text-white/80">
+                          {(t.profiles as Record<string, unknown>)?.full_name as string ?? "Customer"}
+                        </span>
+                        {" → "}
+                        <span className="text-white/80">
+                          {(t.providers as Record<string, unknown>)?.business_name as string ?? "Provider"}
+                        </span>
+                      </div>
+                      {t.note ? (
+                        <span className="text-xs text-white/40 italic truncate max-w-[200px]">
+                          &ldquo;{String(t.note)}&rdquo;
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="text-xs text-white/30">
+                      {new Date(t.created_at as string).toLocaleDateString()}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* AI Agent Status */}
         <div className="mt-8">

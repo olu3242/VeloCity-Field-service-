@@ -59,6 +59,17 @@ export default async function ProviderDashboard() {
     .is("rejected_at", null)
     .order("offered_at", { ascending: false });
 
+  // Tips received
+  const { data: tips } = await supabase
+    .from("provider_tips")
+    .select("id, job_id, amount_cents, note, payment_status, created_at")
+    .eq("provider_id", provider.id)
+    .eq("payment_status", "succeeded")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const totalTipsCents = tips?.reduce((sum, t) => sum + (t.amount_cents ?? 0), 0) ?? 0;
+
   const activeJobs = jobs?.filter((j) =>
     ["accepted", "scheduled", "deposit_paid", "en_route", "arrived", "diagnosis_in_progress", "quote_approved", "in_progress"].includes(j.status)
   );
