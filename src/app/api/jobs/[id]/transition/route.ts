@@ -6,6 +6,7 @@ import { nova } from "@/lib/agents/nova";
 import { transitionSchema, validationError } from "@/lib/validation";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
+import { calculateCancellationPolicy } from "@/lib/policies/cancellationRules";
 import type { JobStatus, UserRole } from "@/types";
 
 export async function POST(
@@ -77,6 +78,27 @@ export async function POST(
     return NextResponse.json({ error: "Reason required for this transition" }, { status: 400 });
   }
 
+  if (to_status === "in_progress") {
+    const [{ data: checkin }, { data: beforePhoto }] = await Promise.all([
+      supabase.from("job_checkins").select("id").eq("tenant_id", tenantId).eq("job_id", id).eq("status", "arrived").limit(1).maybeSingle(),
+      supabase.from("job_photos").select("id").eq("tenant_id", tenantId).eq("job_id", id).eq("photo_type", "before").limit(1).maybeSingle(),
+    ]);
+    if (!checkin) return NextResponse.json({ error: "Valid provider arrival check-in is required before work starts." }, { status: 409 });
+    if (!beforePhoto) return NextResponse.json({ error: "At least one before photo is required before work starts." }, { status: 409 });
+  }
+
+  if (to_status === "completed_pending_confirmation") {
+    const { data: afterPhoto } = await supabase
+      .from("job_photos")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("job_id", id)
+      .eq("photo_type", "after")
+      .limit(1)
+      .maybeSingle();
+    if (!afterPhoto) return NextResponse.json({ error: "At least one after photo is required before completion." }, { status: 409 });
+  }
+
   // ── GABRIEL governance check ───────────────────────────────
   try {
     const governance = await checkGovernance({
@@ -107,7 +129,11 @@ export async function POST(
   // ── Apply the transition ───────────────────────────────────
   const { data: updatedJob, error: updateError } = await supabase
     .from("jobs")
-    .update({ status: to_status })
+    .update({
+      status: to_status,
+      accept_time: to_status === "accepted" ? new Date().toISOString() : job.accept_time,
+      completion_time: ["completed_pending_confirmation", "completed"].includes(to_status) ? new Date().toISOString() : job.completion_time,
+    })
     .eq("id", id)
     .eq("tenant_id", tenantId)
     .select()
@@ -173,6 +199,31 @@ export async function POST(
         dedupKey: `${transitionEvent}:${id}:${Date.now()}`,
         payload: { ...basePayload, reason: reason ?? null },
       });
+    }
+
+    if (to_status === "cancelled") {
+      const policy = calculateCancellationPolicy({ status: job.status, actorRole, quotedCostCents: job.quoted_cost_cents });
+      await supabase.from("audit_logs").insert({
+        tenant_id: tenantId,
+        actor_id: user.id,
+        actor_role: actorRole,
+        action: policy.event,
+        entity_type: "job",
+        entity_id: id,
+        metadata: policy,
+      });
+      if (policy.feeCents > 0) {
+        await emitEvent(supabase, {
+          type: "cancellation_fee_applied",
+          source: "api.jobs.transition",
+          entityType: "job",
+          entityId: id,
+          actorId: user.id,
+          tenantId,
+          dedupKey: `cancellation_fee_applied:${id}:${Date.now()}`,
+          payload: { ...basePayload, fee_cents: policy.feeCents, reason: policy.reason },
+        });
+      }
     }
 
     if (to_status === "customer_confirmed" || to_status === "completed") {

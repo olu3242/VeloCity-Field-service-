@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { JobTransitionButton } from "@/components/jobs/job-transition-button";
+import { CheckInButton } from "@/components/jobs/check-in-button";
+import { PhotoUploadForm } from "@/components/jobs/photo-upload-form";
+import { MessagePanel } from "@/components/jobs/message-panel";
+import { getSlaStatus } from "@/lib/sla/slaStatus";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -52,6 +56,12 @@ export default async function ProviderJobPage({
 
   const progress = getJobProgressPercent(job.status as Job["status"]);
   const transitions = getAvailableTransitions(job.status as Job["status"], "provider");
+  const [{ data: checkins }, { data: photos }, { data: messages }] = await Promise.all([
+    supabase.from("job_checkins").select("*").eq("tenant_id", job.tenant_id).eq("job_id", job.id).order("created_at", { ascending: false }),
+    supabase.from("job_photos").select("*").eq("tenant_id", job.tenant_id).eq("job_id", job.id).order("created_at", { ascending: false }),
+    supabase.from("job_messages").select("*").eq("tenant_id", job.tenant_id).eq("job_id", job.id).order("created_at", { ascending: true }),
+  ]);
+  const sla = getSlaStatus(job);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -125,6 +135,28 @@ export default async function ProviderJobPage({
             </CardContent>
           </Card>
         )}
+
+        <div className="mb-6 grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Arrival Verification</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <Badge variant={checkins?.length ? "success" : "warning"}>{checkins?.length ? "verified" : "pending"}</Badge>
+              <CheckInButton jobId={job.id} />
+              <p className="text-xs text-gray-500">GPS check-in is required before work can begin.</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-base">SLA</CardTitle></CardHeader>
+            <CardContent>
+              <Badge variant={sla.breached ? "destructive" : sla.warning ? "warning" : "secondary"}>{sla.label}</Badge>
+              <p className="mt-2 text-xs text-gray-500">Arrival deadline: {formatDateTime(sla.deadline)}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-base">Evidence Upload</CardTitle></CardHeader>
+            <CardContent><PhotoUploadForm jobId={job.id} /></CardContent>
+          </Card>
+        </div>
 
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
@@ -212,6 +244,23 @@ export default async function ProviderJobPage({
                 </CardContent>
               </Card>
             )}
+
+            <Card>
+              <CardHeader><CardTitle>Job Photos</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {(photos ?? []).map((photo) => (
+                  <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="block rounded-md border p-3 text-sm hover:border-velocity-300">
+                    {photo.photo_type} photo · {formatDateTime(photo.created_at)}
+                  </a>
+                ))}
+                {!photos?.length && <p className="text-sm text-gray-500">No job photos uploaded yet.</p>}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Job Chat</CardTitle></CardHeader>
+              <CardContent><MessagePanel jobId={job.id} messages={messages ?? []} /></CardContent>
+            </Card>
 
             {/* Submit Quote button for diagnosis stage */}
             {job.status === "diagnosis_in_progress" && (

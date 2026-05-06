@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ivy } from "@/lib/agents/ivy";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
+import { buildEvidenceBundle } from "@/lib/disputes/buildEvidenceBundle";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -23,9 +24,11 @@ export async function POST(request: NextRequest) {
 
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
 
+  const evidenceBundle = await buildEvidenceBundle({ supabase, tenantId, jobId: job_id });
+
   // IVY analyzes the dispute immediately
   const ivyAnalysis = await ivy.analyzeDispute(
-    { reason, description, evidence_urls },
+    { reason, description, evidence_urls, evidence_bundle: evidenceBundle },
     job,
     job.payments ?? [],
     undefined,
@@ -68,8 +71,9 @@ export async function POST(request: NextRequest) {
       reason,
       description,
       evidence_urls: evidence_urls ?? [],
+      evidence_bundle: evidenceBundle,
     },
   });
 
-  return NextResponse.json({ data: dispute, ivy_analysis: ivyAnalysis }, { status: 201 });
+  return NextResponse.json({ data: dispute, ivy_analysis: ivyAnalysis, evidence_bundle: evidenceBundle }, { status: 201 });
 }

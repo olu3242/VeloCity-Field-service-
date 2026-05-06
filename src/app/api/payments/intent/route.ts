@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
   if (!access.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const intent = hasEnvGroup("stripe")
-    ? await createVelocityPaymentIntent({ amountCents: amount_cents, customerId: user.id, jobId: job_id, type, stripeCustomerId: profile?.stripe_customer_id ?? undefined })
-    : await createVelocityPaymentIntent({ amountCents: amount_cents, customerId: user.id, jobId: job_id, type });
+    ? await createVelocityPaymentIntent({ amountCents: amount_cents, customerId: user.id, jobId: job_id, type, stripeCustomerId: profile?.stripe_customer_id ?? undefined, tenantId })
+    : await createVelocityPaymentIntent({ amountCents: amount_cents, customerId: user.id, jobId: job_id, type, tenantId });
   const platformFeeCents = calculatePlatformFee(amount_cents);
 
   // Record payment intent in DB

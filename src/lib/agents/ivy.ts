@@ -46,13 +46,14 @@ Be decisive but compassionate. Platform reputation depends on fair outcomes.
 ALWAYS respond with valid JSON.`;
 
   async analyzeDispute(
-    dispute: Partial<Dispute>,
+    dispute: Partial<Dispute> & { evidence_bundle?: Record<string, unknown> },
     job: Partial<Job>,
     payments: Partial<Payment>[],
     review?: Partial<Review>,
     context: AgentContext = {}
   ): Promise<IvyOutput | null> {
     const totalPaid = payments.reduce((sum, p) => sum + (p.amount_cents ?? 0), 0);
+    const evidenceBundle = dispute.evidence_bundle;
 
     const prompt = `Dispute Analysis:
 
@@ -64,6 +65,7 @@ Dispute:
 Reason: ${dispute.reason}
 Description: ${dispute.description}
 Evidence URLs: ${dispute.evidence_urls?.length ?? 0} files submitted
+Evidence bundle available: ${evidenceBundle ? "yes" : "no"}
 Initiated by: customer
 
 ${review ? `Customer review (${review.rating}★): "${review.comment}"` : "No review submitted"}

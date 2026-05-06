@@ -5,6 +5,7 @@ import { getTenantId } from "@/lib/tenancy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProviderDocumentsList, ProviderJobsList, ProviderPayoutsList, RelatedList } from "@/components/related-lists";
 import { formatCents, formatDateTime } from "@/lib/utils";
 
 export default async function AdminProviderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -100,6 +101,15 @@ export default async function AdminProviderDetailPage({ params }: { params: Prom
             {!payouts?.length && <p className="text-sm text-gray-500">No payout records found.</p>}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="mt-6 grid gap-4 lg:grid-cols-2">
+        <ProviderJobsList tenantId={tenantId} providerId={provider.id} />
+        <ProviderDocumentsList tenantId={tenantId} providerId={provider.id} />
+        <RelatedList title="Provider Availability" table="provider_availability" tenantId={tenantId} filters={[{ column: "provider_id", value: provider.id }]} primaryColumn="day_of_week" statusColumn="is_active" secondaryColumn="start_time" />
+        <RelatedList title="Provider Reviews" table="reviews" tenantId={tenantId} filters={[{ column: "reviewee_id", value: provider.user_id }]} primaryColumn="comment" statusColumn="rating" />
+        <ProviderPayoutsList tenantId={tenantId} providerId={provider.id} />
+        <RelatedList title="Provider Disputes" table="disputes" tenantId={tenantId} filters={[{ column: "against", value: provider.user_id }]} primaryColumn="reason" statusColumn="status" href={(row) => `/admin/disputes/${row.id}`} />
       </section>
     </main>
   );

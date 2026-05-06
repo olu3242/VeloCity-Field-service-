@@ -6,6 +6,8 @@ import { createInAppNotification } from "@/lib/notifications/server";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
 import { checkPermission } from "@/lib/access";
+import { hasPaymentCommitment } from "@/lib/payments/preAuth";
+import { getAvailableProviders } from "@/lib/providers/getAvailableProviders";
 import type { Provider, Job } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -44,17 +46,24 @@ export async function POST(request: NextRequest) {
 
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
 
-  // Get eligible providers
-  const { data: providers } = await adminClient
-    .from("providers")
-    .select("*, profiles!providers_user_id_fkey(full_name)")
-    .eq("tenant_id", tenantId)
-    .eq("status", "approved")
-    .eq("is_online", true)
-    .contains("categories", [job.category]);
+  const preAuth = await hasPaymentCommitment({ supabase: adminClient, tenantId, jobId: job_id, urgency: job.urgency });
+  if (!preAuth.allowed) {
+    await adminClient.from("audit_logs").insert({
+      tenant_id: tenantId,
+      actor_id: user.id,
+      actor_role: "admin",
+      action: "dispatch_blocked_no_payment_commitment",
+      entity_type: "job",
+      entity_id: job_id,
+      metadata: preAuth,
+    });
+    return NextResponse.json({ error: preAuth.reason }, { status: 402 });
+  }
+
+  const providers = await getAvailableProviders({ supabase: adminClient, tenantId, job, category: job.category });
 
   const eligibleProviders = provider_id
-    ? providers?.filter((provider) => provider.id === provider_id)
+    ? providers.filter((provider) => provider.id === provider_id)
     : providers;
 
   if (!eligibleProviders?.length) {
@@ -96,7 +105,7 @@ export async function POST(request: NextRequest) {
   );
 
   // Update job status to offer_sent
-  await adminClient.from("jobs").update({ status: "offer_sent" }).eq("id", job_id).eq("tenant_id", tenantId);
+  await adminClient.from("jobs").update({ status: "offer_sent", dispatch_time: new Date().toISOString() }).eq("id", job_id).eq("tenant_id", tenantId);
 
   await emitEvent(adminClient, {
     type: "job_state_changed",

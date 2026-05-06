@@ -36,6 +36,7 @@ export async function routeAutomationEvent(
     case "provider_offer_sent":
     case "provider_offer_expired":
     case "job_reassigned":
+    case "provider_penalty_applied":
     case "no_provider_accepted": {
       actions.push("MAX.dispatch_review");
       output.max = await runAgent(max, `Automation dispatch review: ${eventType}. Payload: ${JSON.stringify(payload)}`, { jobId, tenantId });
@@ -44,9 +45,11 @@ export async function routeAutomationEvent(
     case "job_accepted":
     case "job_state_changed":
     case "job_started":
+    case "provider_arrived":
     case "job_completed":
     case "customer_confirmed":
     case "sla_breach_detected":
+    case "sla_warning":
     case "stuck_job_detected":
     case "sla_warn":
     case "sla_breach":

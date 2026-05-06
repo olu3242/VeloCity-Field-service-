@@ -5,6 +5,7 @@ import { calculatePlatformFee } from "@/lib/utils";
 import { hasEnvGroup } from "@/lib/env";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { generateReceipt } from "@/lib/finance/generateReceipt";
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -82,6 +83,24 @@ export async function POST(request: NextRequest) {
         entry_type: payment_type ?? "payment",
         metadata: { stripe_payment_intent_id: intent.id, webhook: event.type },
       });
+      const { data: jobForReceipt } = await supabase.from("jobs").select("customer_id,provider_id").eq("id", job_id).eq("tenant_id", tenantId).maybeSingle();
+      if (jobForReceipt?.customer_id) {
+        const { data: receipt } = await generateReceipt({
+          supabase,
+          tenantId,
+          jobId: job_id,
+          customerId: jobForReceipt.customer_id,
+          providerId: jobForReceipt.provider_id,
+          amount: intent.amount,
+          breakdown: {
+            stripe_payment_intent_id: intent.id,
+            payment_type,
+            platform_fee_cents: calculatePlatformFee(intent.amount),
+            provider_payout_cents: intent.amount - calculatePlatformFee(intent.amount),
+          },
+        });
+        if (receipt?.id) await supabase.from("jobs").update({ receipt_id: receipt.id }).eq("id", job_id).eq("tenant_id", tenantId);
+      }
       break;
     }
 

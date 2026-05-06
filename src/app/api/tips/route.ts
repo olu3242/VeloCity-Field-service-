@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
   // ── 4. Handle Stripe or dev-mode fallback ────────────────
   if (isStripeConfigured) {
     try {
-      const { stripe } = await import("@/lib/stripe/client");
+      const { getStripeServer } = await import("@/lib/stripe/client");
+      const stripe = getStripeServer();
 
       // Fetch customer's Stripe ID if available
       const { data: profile } = await supabase
