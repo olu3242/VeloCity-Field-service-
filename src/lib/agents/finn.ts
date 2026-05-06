@@ -1,5 +1,5 @@
 // FINN — Finance & Payment Monitoring Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 import type { Payment, Job } from "@/types";
 
 export interface FinnPayoutOutput {
@@ -55,7 +55,7 @@ ALWAYS respond with valid JSON.`;
     payments: Partial<Payment>[],
     providerCompletedJobs: number,
     hasActiveDispute: boolean,
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<FinnPayoutOutput | null> {
     const totalCaptured = payments
       .filter((p) => p.status === "captured" || p.status === "escrowed")
@@ -84,7 +84,7 @@ Should we release payout? Respond with JSON.`;
   async reconcile(
     payments: Partial<Payment>[],
     dateRange: { from: string; to: string },
-    context: {} = {}
+    context: AgentContext = {}
   ): Promise<FinnReconciliationOutput | null> {
     const summary = {
       total: payments.reduce((s, p) => s + (p.amount_cents ?? 0), 0),

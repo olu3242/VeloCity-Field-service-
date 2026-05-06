@@ -43,6 +43,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 
+  if (user && (pathname.startsWith("/admin") || pathname.startsWith("/provider"))) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    if (pathname.startsWith("/admin") && profile?.role !== "admin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    if (pathname.startsWith("/provider") && profile?.role !== "provider") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+  }
+
   // Redirect logged-in users away from auth pages
   if (user && (pathname.startsWith("/auth/login") || pathname.startsWith("/auth/signup"))) {
     return NextResponse.redirect(new URL("/dashboard", request.url));

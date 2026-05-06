@@ -5,7 +5,6 @@
 // against placeholder credentials.
 import { createClient } from "@supabase/supabase-js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AdminClient = ReturnType<typeof createClient<any>>;
 
 let _adminClient: AdminClient | null = null;

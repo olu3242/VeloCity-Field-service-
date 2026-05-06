@@ -72,10 +72,19 @@ export default async function AdminDashboard() {
             <Link href="/admin/providers">Providers</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
+            <Link href="/admin/command-center">Command</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
+            <Link href="/admin/launch-readiness">Launch</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
+            <Link href="/admin/growth">Growth</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
             <Link href="/admin/disputes">Disputes</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
-            <Link href="/admin/automation">⚙ Automation</Link>
+            <Link href="/admin/automation/logs">Automation</Link>
           </Button>
         </div>
       </nav>

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { alice } from "@/lib/agents/alice";
 import { bookingSchema, validationError } from "@/lib/validation";
+import { emitEvent } from "@/lib/automation/emitEvent";
+import { getTenantId } from "@/lib/tenancy";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -11,11 +13,12 @@ export async function GET(request: NextRequest) {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, tenant_id")
     .eq("id", user.id)
     .single();
 
   const searchParams = request.nextUrl.searchParams;
+  const tenantId = getTenantId(profile);
   const page = parseInt(searchParams.get("page") ?? "1");
   const pageSize = parseInt(searchParams.get("pageSize") ?? "20");
   const status = searchParams.get("status");
@@ -24,6 +27,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("jobs")
     .select("*, profiles!jobs_customer_id_fkey(full_name, avatar_url)", { count: "exact" })
+    .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .range(from, from + pageSize - 1);
 
@@ -34,6 +38,7 @@ export async function GET(request: NextRequest) {
       .from("providers")
       .select("id")
       .eq("user_id", user.id)
+      .eq("tenant_id", tenantId)
       .single();
     if (provider) query = query.eq("provider_id", provider.id);
   }
@@ -59,6 +64,13 @@ export async function POST(request: NextRequest) {
 
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("tenant_id")
+    .eq("id", user.id)
+    .single();
+  const tenantId = getTenantId(profile);
+
   const parsed = bookingSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(validationError(parsed.error), { status: 400 });
@@ -69,13 +81,14 @@ export async function POST(request: NextRequest) {
   const classification = await alice.classify(
     `${body.title}: ${body.description}`,
     body.zip,
-    { userId: user.id }
+    { userId: user.id, tenantId }
   );
 
   const { data: job, error } = await supabase
     .from("jobs")
     .insert({
       customer_id: user.id,
+      tenant_id: tenantId,
       category: body.category,
       title: body.title,
       description: body.description,
@@ -99,24 +112,53 @@ export async function POST(request: NextRequest) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // ── Emit automation event (non-blocking) ─────────────────
   try {
-    const { emitEvent } = await import("@/lib/automation/emitEvent");
-    await emitEvent(
-      "service_request_created",
-      {
-        job_id:      job.id,
+    await emitEvent(supabase, {
+      type: "service_request_created",
+      source: "api.jobs.create",
+      entityType: "job",
+      entityId: job.id,
+      actorId: user.id,
+      tenantId,
+      dedupKey: `service_request_created:${job.id}`,
+      payload: {
+        job_id: job.id,
+        tenant_id: tenantId,
         customer_id: user.id,
-        category:    job.category,
-        urgency:     job.urgency,
-        zip:         job.zip,
-        title:       job.title,
-        description: job.description,
+        category: body.category,
+        urgency: body.urgency,
+        title: body.title,
+        description: body.description,
+        city: body.city,
+        state: body.state,
+        zip: body.zip,
       },
-      `service_request_created:${job.id}`
-    );
+    });
+
+    await emitEvent(supabase, {
+      type: classification?.is_serviceable === false ? "serviceability_failed" : "serviceability_passed",
+      source: "api.jobs.create",
+      entityType: "job",
+      entityId: job.id,
+      actorId: user.id,
+      tenantId,
+      dedupKey: `serviceability:${job.id}`,
+      payload: {
+        job_id: job.id,
+        tenant_id: tenantId,
+        customer_id: user.id,
+        category: body.category,
+        urgency: body.urgency,
+        title: body.title,
+        description: body.description,
+        city: body.city,
+        state: body.state,
+        zip: body.zip,
+        classification,
+      },
+    });
   } catch {
-    // Automation failure must never block the API response
+    // Automation failure must never block booking creation.
   }
 
   return NextResponse.json({ data: job }, { status: 201 });

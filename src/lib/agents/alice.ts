@@ -1,5 +1,5 @@
 // ALICE — Customer Intake & Classification Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 import type { AIClassification, ServiceCategory, UrgencyLevel } from "@/types";
 import { hasEnv } from "@/lib/env";
 
@@ -49,7 +49,7 @@ ALWAYS respond with valid JSON in this exact format:
   async classify(
     description: string,
     zip: string,
-    context: { jobId?: string; userId?: string } = {}
+    context: AgentContext = {}
   ): Promise<AliceOutput | null> {
     if (!hasEnv("ANTHROPIC_API_KEY")) {
       return fallbackClassification(description);

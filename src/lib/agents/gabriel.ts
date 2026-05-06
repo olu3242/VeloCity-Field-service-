@@ -1,5 +1,5 @@
 // GABRIEL — Governance, Compliance & Audit Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
 
 export interface GabrielComplianceOutput {
   compliant: boolean;
@@ -61,7 +61,7 @@ ALWAYS respond with valid JSON. Be thorough — compliance protects customers, p
       years_experience: number;
       completed_jobs: number;
     },
-    context: { userId?: string } = {}
+    context: AgentContext = {}
   ): Promise<GabrielProviderScreenOutput | null> {
     const prompt = `Provider compliance screening:
 Business: ${providerData.business_name}
@@ -91,7 +91,7 @@ Is this provider compliant for approval? Respond with JSON.`;
       has_customer_confirmation: boolean;
       dispute_count: number;
     },
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<GabrielComplianceOutput | null> {
     const prompt = `Job compliance audit:
 Job ID: ${jobSummary.id}

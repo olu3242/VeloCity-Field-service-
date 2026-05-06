@@ -1,5 +1,6 @@
 // QUINN — Quote & Pricing Agent
-import { BaseAgent } from "./base";
+import { BaseAgent, type AgentContext } from "./base";
+import type { AgentResponse } from "@/types";
 import type { QuoteLineItem, ServiceCategory, UrgencyLevel } from "@/types";
 import { hasEnv } from "@/lib/env";
 
@@ -69,11 +70,18 @@ ALWAYS respond with valid JSON for review requests:
     urgency: UrgencyLevel,
     city: string,
     state: string,
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<QuinnOutput | null> {
     const total = lineItems.reduce((sum, li) => sum + li.total_cents, 0);
     if (!hasEnv("ANTHROPIC_API_KEY")) {
-      return fallbackQuoteReview(lineItems, total);
+      const fallback = fallbackQuoteReview(lineItems, total);
+      await this.log(context, "Deterministic QUINN quote review fallback", {
+        success: true,
+        data: fallback,
+        tokensUsed: 0,
+        latencyMs: 0,
+      } as AgentResponse<QuinnOutput>);
+      return fallback;
     }
 
     const prompt = `Review this quote for a ${urgency} ${category} job in ${city}, ${state}:
@@ -94,7 +102,7 @@ Analyze fairness and respond with JSON.`;
     description: string,
     urgency: UrgencyLevel,
     city: string,
-    context: { jobId?: string } = {}
+    context: AgentContext = {}
   ): Promise<QuinnEstimateOutput | null> {
     const prompt = `Generate a fair estimate for this ${urgency} ${category} job in ${city}:
 Description: ${description}
