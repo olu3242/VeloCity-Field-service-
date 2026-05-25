@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProviderApprovalActions } from "@/components/admin/provider-actions";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -86,6 +87,7 @@ export default async function AdminDashboard() {
           <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
             <Link href="/admin/automation/logs">Automation</Link>
           </Button>
+          <NotificationBell />
         </div>
       </nav>
 

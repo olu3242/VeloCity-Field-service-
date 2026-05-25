@@ -1,71 +1,188 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getTenantId } from "@/lib/tenancy";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCents, formatDateTime } from "@/lib/utils";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  SERVICE_CATEGORY_ICONS,
+  formatDateTime,
+} from "@/lib/utils";
+import type { ServiceCategory } from "@/types";
 
-export default async function AdminDisputesPage() {
+interface DisputeJob {
+  title: string;
+  category: string;
+  customer_id: string;
+  provider_id: string;
+  final_cost_cents: number | null;
+}
+
+interface DisputeRow {
+  id: string;
+  status: string;
+  reason: string;
+  created_at: string;
+  job_id: string;
+  jobs: DisputeJob | null;
+}
+
+function getDaysOpen(createdAt: string): number {
+  return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
+}
+
+function statusBadgeColor(status: string): string {
+  switch (status) {
+    case "open": return "bg-red-800 text-red-200";
+    case "under_review": return "bg-yellow-800 text-yellow-200";
+    case "resolved": return "bg-green-800 text-green-200";
+    case "closed": return "bg-gray-700 text-gray-300";
+    default: return "bg-gray-700 text-gray-300";
+  }
+}
+
+export default async function AdminDisputesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const { status: filterStatus } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const { data: profile } = await supabase.from("profiles").select("role, tenant_id").eq("id", user.id).single();
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
   if (profile?.role !== "admin") redirect("/dashboard");
-  const tenantId = getTenantId(profile);
 
-  const { data: disputes } = await supabase
+  const { data: allDisputesRaw } = await supabase
     .from("disputes")
-    .select("*, jobs(title, category, status, final_cost_cents, quoted_cost_cents)")
-    .eq("tenant_id", tenantId)
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .select("id, status, reason, created_at, job_id, jobs!disputes_job_id_fkey(title, category, customer_id, provider_id, final_cost_cents)")
+    .order("created_at", { ascending: false });
 
-  const open = disputes?.filter((item) => !["resolved", "closed"].includes(item.status)).length ?? 0;
-  const refundExposure = disputes?.reduce((sum, item) => sum + (item.refund_amount_cents ?? 0), 0) ?? 0;
+  const allDisputes = (allDisputesRaw ?? []) as unknown as DisputeRow[];
+
+  const openCount = allDisputes.filter(d => d.status === "open").length;
+  const underReviewCount = allDisputes.filter(d => d.status === "under_review").length;
+  const resolvedCount = allDisputes.filter(d => d.status === "resolved").length;
+  const totalCount = allDisputes.length;
+
+  const filtered = filterStatus
+    ? allDisputes.filter(d => d.status === filterStatus)
+    : allDisputes;
+
+  const tabStatuses = [
+    { label: "All", value: undefined },
+    { label: "Open", value: "open" },
+    { label: "Under Review", value: "under_review" },
+    { label: "Resolved", value: "resolved" },
+  ];
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Disputes</h1>
-          <p className="text-sm text-gray-500">Tenant-scoped dispute queue and payout risk view.</p>
+    <div className="min-h-screen bg-gray-950 text-white">
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">Dispute Queue</h1>
+            {openCount > 0 && (
+              <span className="px-2 py-1 rounded-full bg-red-800 text-red-200 text-xs font-bold">
+                {openCount} open
+              </span>
+            )}
+          </div>
+          <Link href="/admin/dashboard" className="text-sm text-white/50 hover:text-white/80">
+            ← Dashboard
+          </Link>
         </div>
-        <Button asChild variant="outline"><Link href="/admin/command-center">Command Center</Link></Button>
-      </div>
 
-      <section className="mb-6 grid gap-4 md:grid-cols-3">
-        <Card><CardContent className="pt-6"><div className="text-3xl font-bold">{disputes?.length ?? 0}</div><div className="text-sm text-gray-500">Total Disputes</div></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-3xl font-bold text-red-700">{open}</div><div className="text-sm text-gray-500">Open Reviews</div></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-3xl font-bold">{formatCents(refundExposure)}</div><div className="text-sm text-gray-500">Refund Exposure</div></CardContent></Card>
-      </section>
+        {/* Summary Row */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          {[
+            { label: "Total", value: totalCount, color: "text-white" },
+            { label: "Open", value: openCount, color: openCount > 0 ? "text-red-400" : "text-white" },
+            { label: "Under Review", value: underReviewCount, color: underReviewCount > 0 ? "text-yellow-400" : "text-white" },
+            { label: "Resolved", value: resolvedCount, color: "text-green-400" },
+          ].map(stat => (
+            <Card key={stat.label} className="bg-white/5 border-white/10">
+              <CardContent className="pt-6">
+                <div className={`text-3xl font-bold ${stat.color}`}>{stat.value}</div>
+                <div className="text-sm text-white/50 mt-1">{stat.label}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
-      <Card>
-        <CardHeader><CardTitle>Dispute Queue</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
-          {(disputes ?? []).map((dispute) => {
-            const job = dispute.jobs as { title?: string; status?: string; final_cost_cents?: number | null; quoted_cost_cents?: number | null } | null;
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-2 mb-6">
+          {tabStatuses.map(tab => {
+            const href = tab.value ? `/admin/disputes?status=${tab.value}` : "/admin/disputes";
+            const isActive = filterStatus === tab.value || (!filterStatus && !tab.value);
             return (
-              <div key={dispute.id} className="rounded-md border p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <div className="font-semibold">{dispute.reason}</div>
-                    <div className="text-sm text-gray-500">{job?.title ?? "Unknown job"} · {formatDateTime(dispute.created_at)}</div>
-                    <p className="mt-2 text-sm text-gray-600">{dispute.description ?? "No description provided."}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={dispute.status === "under_review" ? "warning" : dispute.status === "resolved" ? "success" : "secondary"}>{dispute.status}</Badge>
-                    <Badge variant="outline">{formatCents(dispute.refund_amount_cents ?? job?.final_cost_cents ?? job?.quoted_cost_cents ?? 0)}</Badge>
-                  </div>
-                </div>
-              </div>
+              <Link
+                key={tab.label}
+                href={href}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-white/20 text-white"
+                    : "text-white/50 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                {tab.label}
+              </Link>
             );
           })}
-          {!disputes?.length && <p className="text-sm text-gray-500">No disputes found.</p>}
-        </CardContent>
-      </Card>
-    </main>
+        </div>
+
+        {/* Dispute Cards */}
+        <div className="space-y-3">
+          {filtered.length === 0 ? (
+            <Card className="bg-white/5 border-white/10">
+              <CardContent className="py-12 text-center text-white/40">
+                No disputes found
+              </CardContent>
+            </Card>
+          ) : filtered.map(dispute => {
+            const job = dispute.jobs;
+            const daysOpen = getDaysOpen(dispute.created_at);
+            const reasonTruncated = dispute.reason?.length > 120
+              ? dispute.reason.slice(0, 120) + "..."
+              : dispute.reason ?? "—";
+
+            return (
+              <Link key={dispute.id} href={`/admin/disputes/${dispute.id}`}>
+                <Card className="bg-white/5 border-white/10 hover:bg-white/10 transition-colors cursor-pointer">
+                  <CardContent className="py-4 px-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <span className="text-xl flex-shrink-0 mt-0.5">
+                          {job ? (SERVICE_CATEGORY_ICONS[job.category as ServiceCategory] ?? "🛠️") : "🛠️"}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-white text-sm">
+                            {job?.title ?? "Unknown Job"}
+                          </div>
+                          <p className="text-xs text-white/50 mt-1 leading-relaxed">
+                            {reasonTruncated}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <span className="text-xs text-white/40">
+                          {daysOpen === 0 ? "Today" : `${daysOpen}d open`}
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${statusBadgeColor(dispute.status)}`}>
+                          {dispute.status.replace("_", " ")}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-white/30 mt-2 ml-9">
+                      Opened {formatDateTime(dispute.created_at)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
