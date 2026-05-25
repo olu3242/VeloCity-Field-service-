@@ -1,5 +1,5 @@
 # VeloCity Enterprise Platform — Implementation Plan
-**Date:** 2026-05-23
+**Date:** 2026-05-25 (updated; original: 2026-05-23)
 **Branch:** claude/build-velocity-field-service-JVoOY
 **Philosophy:** Harmonize, extend, operationalize — never rebuild what works.
 
@@ -415,3 +415,21 @@ Connect `admin/providers/[id]/approve` route to `gabriel.screenProvider()` — v
 | `src/app/api/automation/status/route.ts` | 6 | UPDATE | Add health + cost data |
 | `src/lib/automation/governance.ts` | 7 | UPDATE | Risk-based fail posture |
 | `vercel.json` | 8 | CREATE | Cron schedule |
+
+---
+
+## Wave 1 Completion Status — 2026-05-25
+
+All Wave 1 contract files are CREATED and passing TypeScript checks:
+
+| File | Status | Notes |
+|------|--------|-------|
+| `src/lib/contracts/events.ts` | ✅ DONE | 57+ event types + VeloEvent envelope + isAutomationEventType guard |
+| `src/lib/contracts/agents.ts` | ✅ DONE | AgentName × 10, AGENT_ROLES map, AgentResult, AgentRunRecord, AgentCapability |
+| `src/lib/contracts/queues.ts` | ✅ DONE | QueueItem, AutomationRun, WorkerConfig, WorkerResult, EmitResult |
+| `src/lib/contracts/notifications.ts` | ✅ DONE | NotificationType × 12, NotificationPayload, NotificationRow, API response shapes |
+| `src/lib/contracts/runtime.ts` | ✅ DONE | RuntimeConfig, DEFAULT_RUNTIME_CONFIG, WorkerHeartbeat, QueueHealth, PlatformHealth |
+| `src/lib/contracts/health.ts` | ✅ DONE | getPlatformHealth() — queries automation_queue + automation_runs; error → "down" |
+| `src/lib/contracts/index.ts` | ✅ DONE | Barrel re-export (health.ts excluded — has async functions) |
+
+**Remaining Wave 1:** Update `src/lib/automation/types.ts` and `src/types/automation.ts` to re-export from contracts (Wave 1 import cleanup).

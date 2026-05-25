@@ -6,8 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Activity, AlertTriangle, CheckCircle, Clock, DollarSign,
-  RefreshCw, XCircle, Zap, Bot, TrendingUp,
+  RefreshCw, XCircle, Zap, Bot, TrendingUp, Heart, Server, Cpu,
 } from "lucide-react";
+import type { PlatformHealth } from "@/lib/contracts/runtime";
 
 interface AutomationStatus {
   queue: { pending: number; failed: number; completed_24h: number };
@@ -19,6 +20,32 @@ interface AutomationStatus {
     id: string; event_type: string; status: string; created_at: string;
   }>;
   payouts_pending: number;
+  health?: PlatformHealth;
+}
+
+function HealthBadge({ status }: { status: "healthy" | "degraded" | "down" }) {
+  const styles = {
+    healthy:  "bg-emerald-100 text-emerald-700 border-emerald-200",
+    degraded: "bg-amber-100 text-amber-700 border-amber-200",
+    down:     "bg-red-100 text-red-700 border-red-200",
+  };
+  const icons = {
+    healthy:  <CheckCircle className="h-3.5 w-3.5" />,
+    degraded: <AlertTriangle className="h-3.5 w-3.5" />,
+    down:     <XCircle className="h-3.5 w-3.5" />,
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${styles[status]}`}>
+      {icons[status]} {status}
+    </span>
+  );
+}
+
+function formatAge(ms: number | null): string {
+  if (ms === null) return "—";
+  if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
+  return `${Math.floor(ms / 3_600_000)}h`;
 }
 
 function statusColor(status: string) {
@@ -119,6 +146,70 @@ export default function AutomationDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Runtime Health */}
+      {data?.health && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Heart className="h-4 w-4 text-rose-500" />
+              Runtime Health
+              <span className="ml-auto text-xs text-muted-foreground font-normal">
+                {new Date(data.health.timestamp).toLocaleTimeString()}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Zap className="h-4 w-4 text-yellow-500" /> Automation Engine
+                </div>
+                <HealthBadge status={data.health.automation_engine} />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Cpu className="h-4 w-4 text-purple-500" /> AI Runtime
+                </div>
+                <HealthBadge status={data.health.ai_runtime} />
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <DollarSign className="h-4 w-4 text-emerald-500" /> Stripe
+                </div>
+                <HealthBadge status={data.health.stripe} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="p-3 rounded bg-muted/40">
+                <p className="text-2xl font-bold">{data.health.queue.total}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Total Queue</p>
+              </div>
+              <div className="p-3 rounded bg-amber-50">
+                <p className="text-2xl font-bold text-amber-700">{data.health.queue.pending}</p>
+                <p className="text-xs text-amber-600 mt-0.5">Pending</p>
+              </div>
+              <div className="p-3 rounded bg-emerald-50">
+                <p className="text-2xl font-bold text-emerald-700">{data.health.queue.completed}</p>
+                <p className="text-xs text-emerald-600 mt-0.5">Completed</p>
+              </div>
+              <div className="p-3 rounded bg-red-50">
+                <p className="text-2xl font-bold text-red-700">{data.health.queue.failed}</p>
+                <p className="text-xs text-red-600 mt-0.5">Failed</p>
+              </div>
+            </div>
+            {data.health.queue.oldest_pending_age_ms !== null && (
+              <p className="text-xs text-muted-foreground mt-3">
+                <Server className="h-3 w-3 inline mr-1" />
+                Oldest pending item: {formatAge(data.health.queue.oldest_pending_age_ms)} ago
+                {data.health.last_processed_at && (
+                  <span className="ml-3">Last run: {timeAgo(data.health.last_processed_at)}</span>
+                )}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

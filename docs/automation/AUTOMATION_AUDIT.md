@@ -1,5 +1,6 @@
 # VeloCity Automation Audit
-**Date:** 2026-05-23
+**Date:** 2026-05-25 (updated)
+**Previous audit:** 2026-05-23
 **Branch:** claude/build-velocity-field-service-JVoOY
 **Auditor:** Claude Code (claude-sonnet-4-6)
 
@@ -234,3 +235,25 @@ The module-level `_adminClient` singleton in `admin.ts` will persist across test
 | Two daily intelligence routes | `cron/daily` emits 3 events; `cron/daily-intelligence` emits the same events plus per-entity variants — may double-emit if both run |
 | `provider_scoring` handled in lena-retention.ts | Semantic mismatch — scoring logic in retention handler |
 | GABRIEL audit log written twice | Once in router.ts (always) and once in governance.ts when governance is invoked |
+
+---
+
+## Update — 2026-05-25: Contracts Layer Complete
+
+The `src/lib/contracts/` directory now contains the full set of typed contract files:
+
+| File | Status | Description |
+|------|--------|-------------|
+| `contracts/events.ts` | BUILT | Canonical VeloEvent + AutomationEventType (57 types + `agent_run`) |
+| `contracts/agents.ts` | BUILT | AgentName, AgentContext, AgentResult, AgentRunRecord, AgentCapability |
+| `contracts/queues.ts` | BUILT | QueueItem, QueueStatus, AutomationRun, WorkerConfig, WorkerResult, EmitResult |
+| `contracts/notifications.ts` | BUILT | NotificationType, NotificationChannel, NotificationPayload, NotificationRow |
+| `contracts/runtime.ts` | BUILT | RuntimeConfig, WorkerHeartbeat, QueueHealth, PlatformHealth |
+| `contracts/health.ts` | BUILT | `getPlatformHealth()` async function — queries automation_queue + automation_runs |
+| `contracts/index.ts` | BUILT | Barrel re-export of events/agents/queues/notifications/runtime |
+
+**Gap G2 (dual type definitions) is PARTIALLY resolved:** `src/lib/contracts/events.ts` is the canonical source. The old files (`src/types/automation.ts`, `src/lib/automation/types.ts`) have not yet been updated to re-export from contracts — this is Wave 1 item still pending.
+
+**Stripe tip webhook (G3) is RESOLVED:** `payment_intent.succeeded` case now correctly detects `metadata.tip === "true"`, updates `provider_tips.payment_status`, and emits `tip_submitted` event with full metadata.
+
+**Notifications API is HARDENED:** GET supports `?limit=N`, maps `is_read → read`, returns `{ data: Notification[] }` compatible with NotificationBell. PATCH supports `mark_all_read`, `id`, and `ids` batch marking.

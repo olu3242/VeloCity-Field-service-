@@ -1,5 +1,5 @@
 # VeloCity Gap Analysis
-**Date:** 2026-05-23
+**Date:** 2026-05-25 (updated; original: 2026-05-23)
 **Branch:** claude/build-velocity-field-service-JVoOY
 **Based on:** Full code audit of automation/, agents/, api/ directories
 
@@ -176,3 +176,16 @@ No `vercel.json` was found in the repository. Without it, the cron routes at `/a
 4. **Fix the admin notification user_id in ivy-dispute.ts** — query real admin user IDs before inserting (P1-2). One production dispute will expose this bug.
 
 5. **Add SELECT FOR UPDATE SKIP LOCKED to queue worker** — prevents double-processing under concurrent cron runs (P0-3). Implement as a Supabase RPC function `claim_automation_queue_item(limit int)`.
+
+---
+
+## Status Update — 2026-05-25
+
+| Gap ID | Description | Status |
+|--------|-------------|--------|
+| P0-2 (dual types) | PARTIALLY resolved — `contracts/events.ts` is canonical; old files not yet updated to re-export |
+| P0-4 (tip router) | RESOLVED — Stripe webhook `payment_intent.succeeded` now emits `tip_submitted` correctly; router still lacks `case "tip_submitted"` |
+| P1-2 (admin user_id) | OPEN — `ivy-dispute.ts` still uses `user_id: "admin"` |
+| P1-6 (notifications) | PARTIALLY resolved — API hardened (GET/PATCH); real-time push not yet implemented |
+| Contracts layer | RESOLVED — all 6 contract files created (`events`, `agents`, `queues`, `notifications`, `runtime`, `health`, `index`) |
+| Runtime health display | RESOLVED — `getPlatformHealth()` implemented; admin page integration pending (Task 8) |
