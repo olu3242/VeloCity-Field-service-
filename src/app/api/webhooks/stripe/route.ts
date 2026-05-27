@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { constructWebhookEvent } from "@/lib/stripe/client";
 import { createAdminClient } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { calculatePlatformFee } from "@/lib/utils";
 import { hasEnvGroup } from "@/lib/env";
 import { emitEvent } from "@/lib/automation/emitEvent";
@@ -31,8 +32,43 @@ export async function POST(request: NextRequest) {
   switch (event.type as string) {
     case "payment_intent.succeeded": {
       const intent = event.data.object as any;
+      const tenantId = intent.metadata?.tenant_id ?? DEFAULT_TENANT_ID;
+
+      // Handle tip payments separately
+      if (intent.metadata?.tip === "true") {
+        const db = getAdminClient();
+        await db.from("provider_tips")
+          .update({ payment_status: "succeeded" })
+          .eq("stripe_payment_intent_id", intent.id)
+          .eq("payment_status", "pending");
+
+        const { data: tipRecord } = await db.from("provider_tips")
+          .select("id, provider_id, amount_cents, job_id")
+          .eq("stripe_payment_intent_id", intent.id)
+          .single();
+
+        if (tipRecord) {
+          await emitEvent(supabase, {
+            type: "tip_submitted",
+            tenantId,
+            source: "api.webhooks.stripe",
+            entityType: "tip",
+            entityId: tipRecord.id,
+            dedupKey: `tip_succeeded:${intent.id}`,
+            payload: {
+              tip_id: tipRecord.id,
+              provider_id: tipRecord.provider_id,
+              amount_cents: tipRecord.amount_cents,
+              job_id: tipRecord.job_id,
+              stripe_payment_intent_id: intent.id,
+              tenant_id: tenantId,
+            },
+          });
+        }
+        break;
+      }
+
       const { job_id, payment_type } = intent.metadata;
-      const tenantId = intent.metadata.tenant_id ?? DEFAULT_TENANT_ID;
 
       await supabase
         .from("payments")

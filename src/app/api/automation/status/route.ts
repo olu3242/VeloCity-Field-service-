@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
+import { getPlatformHealth } from "@/lib/contracts/health";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
       { data: recentRuns },
       { data: recentEvents },
       { count: pendingPayouts },
+      health,
     ] = await Promise.all([
       db.from("automation_queue").select("*", { count: "exact", head: true }).eq("status", "pending"),
       db.from("automation_queue").select("*", { count: "exact", head: true }).eq("status", "failed"),
@@ -30,6 +32,7 @@ export async function GET(request: NextRequest) {
       db.from("automation_runs").select("id, event_type, handler, status, duration_ms, error_message, created_at").order("created_at", { ascending: false }).limit(20),
       db.from("automation_events").select("id, event_type, status, created_at").order("created_at", { ascending: false }).limit(20),
       db.from("payout_queue").select("*", { count: "exact", head: true }).eq("status", "queued"),
+      getPlatformHealth(),
     ]);
 
     return NextResponse.json({
@@ -38,6 +41,7 @@ export async function GET(request: NextRequest) {
         recent_runs: recentRuns ?? [],
         recent_events: recentEvents ?? [],
         payouts_pending: pendingPayouts ?? 0,
+        health,
       },
     });
   } catch (err) {

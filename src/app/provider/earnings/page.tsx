@@ -1,85 +1,251 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getTenantId } from "@/lib/tenancy";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCents, formatDateTime } from "@/lib/utils";
+import {
+  JOB_STATUS_LABELS,
+  SERVICE_CATEGORY_ICONS,
+  formatCents,
+  formatDateTime,
+} from "@/lib/utils";
+import type { JobStatus, ServiceCategory } from "@/types";
+
+interface ProviderRow {
+  id: string;
+  business_name: string;
+  trust_score: number | null;
+}
+
+interface JobRow {
+  id: string;
+  title: string;
+  category: string;
+  status: string;
+  final_cost_cents: number | null;
+  created_at: string;
+}
+
+interface TipRow {
+  id: string;
+  amount_cents: number;
+  created_at: string;
+  job_id: string;
+}
+
+interface PayoutRow {
+  id: string;
+  amount_cents: number;
+  status: string;
+  created_at: string;
+  released_at: string | null;
+}
+
+function payoutStatusColor(status: string): string {
+  switch (status) {
+    case "released": return "bg-green-100 text-green-700";
+    case "pending": return "bg-yellow-100 text-yellow-700";
+    case "failed": return "bg-red-100 text-red-700";
+    default: return "bg-gray-100 text-gray-700";
+  }
+}
 
 export default async function ProviderEarningsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const { data: profile } = await supabase.from("profiles").select("role, tenant_id").eq("id", user.id).single();
-  if (profile?.role !== "provider") redirect("/dashboard");
-  const tenantId = getTenantId(profile);
+  const { data: providerRaw } = await supabase
+    .from("providers")
+    .select("id, business_name, trust_score")
+    .eq("user_id", user.id).single();
 
-  const { data: provider } = await supabase.from("providers").select("*").eq("user_id", user.id).eq("tenant_id", tenantId).single();
-  if (!provider) redirect("/provider/apply");
+  if (!providerRaw) redirect("/provider/apply");
+  const provider = providerRaw as unknown as ProviderRow;
 
-  const [{ data: jobs }, { data: payouts }, { data: payments }] = await Promise.all([
-    supabase.from("jobs").select("*").eq("provider_id", provider.id).eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("payout_ledger").select("*").eq("provider_id", provider.id).eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("payments").select("*").eq("provider_id", provider.id).eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
+  const [{ data: jobsRaw }, { data: tipsRaw }, { data: payoutsRaw }] = await Promise.all([
+    supabase.from("jobs")
+      .select("id, title, category, status, final_cost_cents, created_at")
+      .eq("provider_id", provider.id)
+      .in("status", ["customer_confirmed","completed","closed","refunded"])
+      .order("created_at", { ascending: false }),
+    supabase.from("provider_tips")
+      .select("id, amount_cents, created_at, job_id")
+      .eq("provider_id", provider.id).eq("payment_status", "succeeded")
+      .order("created_at", { ascending: false }),
+    supabase.from("payout_queue")
+      .select("id, amount_cents, status, created_at, released_at")
+      .eq("provider_id", provider.id)
+      .order("created_at", { ascending: false }).limit(30),
   ]);
 
-  const completedJobs = jobs?.filter((job) => ["completed", "closed"].includes(job.status)) ?? [];
-  const gross = completedJobs.reduce((sum, job) => sum + (job.final_cost_cents ?? job.quoted_cost_cents ?? 0), 0);
-  const pending = payouts?.filter((payout) => ["payout_pending", "queued"].includes(payout.status)).reduce((sum, payout) => sum + Number(payout.amount ?? 0), 0) ?? 0;
-  const held = payouts?.filter((payout) => ["payout_hold", "held", "failed"].includes(payout.status)).reduce((sum, payout) => sum + Number(payout.amount ?? 0), 0) ?? 0;
-  const released = payouts?.filter((payout) => ["payout_released", "released"].includes(payout.status)).reduce((sum, payout) => sum + Number(payout.amount ?? 0), 0) ?? 0;
+  const jobs = (jobsRaw ?? []) as unknown as JobRow[];
+  const tips = (tipsRaw ?? []) as unknown as TipRow[];
+  const payouts = (payoutsRaw ?? []) as unknown as PayoutRow[];
+
+  const totalEarned = jobs.reduce((sum, j) => sum + Math.round((j.final_cost_cents ?? 0) * 0.82), 0);
+  const totalTips = tips.reduce((sum, t) => sum + (t.amount_cents ?? 0), 0);
+  const combined = totalEarned + totalTips;
+  const pendingPayouts = payouts
+    .filter(p => p.status === "pending")
+    .reduce((sum, p) => sum + (p.amount_cents ?? 0), 0);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Earnings</h1>
-          <p className="text-sm text-gray-500">{provider.business_name}</p>
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <Link href="/provider/dashboard" className="text-sm text-gray-500 hover:text-gray-700 mb-3 inline-block">
+            ← Back to Dashboard
+          </Link>
+          <h1 className="text-2xl font-bold text-gray-900">Earnings — {provider.business_name}</h1>
         </div>
-        <Button asChild variant="outline"><Link href="/provider/dashboard">Dashboard</Link></Button>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-gray-900">{formatCents(totalEarned)}</div>
+              <div className="text-sm text-gray-500 mt-1">Total Earned (82%)</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-emerald-600">{formatCents(totalTips)}</div>
+              <div className="text-sm text-gray-500 mt-1">Total Tips</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-blue-600">{formatCents(combined)}</div>
+              <div className="text-sm text-gray-500 mt-1">Combined Total</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold text-yellow-600">{formatCents(pendingPayouts)}</div>
+              <div className="text-sm text-gray-500 mt-1">Pending Payouts</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-8">
+          {/* Completed Jobs */}
+          <Card>
+            <CardHeader><CardTitle>Completed Jobs</CardTitle></CardHeader>
+            <CardContent>
+              {jobs.length === 0 ? (
+                <p className="text-sm text-gray-500">No completed jobs yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500">
+                        <th className="pb-2 font-medium">Job</th>
+                        <th className="pb-2 font-medium">Status</th>
+                        <th className="pb-2 font-medium text-right">Gross</th>
+                        <th className="pb-2 font-medium text-right">Your Payout (82%)</th>
+                        <th className="pb-2 font-medium text-right">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {jobs.map(job => (
+                        <tr key={job.id} className="py-2">
+                          <td className="py-2 pr-4">
+                            <div className="flex items-center gap-2">
+                              <span>{SERVICE_CATEGORY_ICONS[job.category as ServiceCategory] ?? "🛠️"}</span>
+                              <span className="font-medium text-gray-800">{job.title}</span>
+                            </div>
+                          </td>
+                          <td className="py-2 pr-4">
+                            <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                              {JOB_STATUS_LABELS[job.status as JobStatus] ?? job.status}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-4 text-right text-gray-700">{formatCents(job.final_cost_cents ?? 0)}</td>
+                          <td className="py-2 pr-4 text-right text-green-600 font-medium">
+                            {formatCents(Math.round((job.final_cost_cents ?? 0) * 0.82))}
+                          </td>
+                          <td className="py-2 text-right text-gray-400">{formatDateTime(job.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tips Received */}
+          <Card>
+            <CardHeader><CardTitle>Tips Received</CardTitle></CardHeader>
+            <CardContent>
+              {tips.length === 0 ? (
+                <p className="text-sm text-gray-500">No tips received yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500">
+                        <th className="pb-2 font-medium">Job ID</th>
+                        <th className="pb-2 font-medium text-right">Amount</th>
+                        <th className="pb-2 font-medium text-right">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {tips.map(tip => (
+                        <tr key={tip.id} className="py-2">
+                          <td className="py-2 pr-4 text-gray-500 font-mono text-xs">{tip.job_id?.slice(0, 12)}...</td>
+                          <td className="py-2 pr-4 text-right text-emerald-600 font-medium">{formatCents(tip.amount_cents)}</td>
+                          <td className="py-2 text-right text-gray-400">{formatDateTime(tip.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Payout History */}
+          <Card>
+            <CardHeader><CardTitle>Payout History</CardTitle></CardHeader>
+            <CardContent>
+              {payouts.length === 0 ? (
+                <p className="text-sm text-gray-500">No payout history yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500">
+                        <th className="pb-2 font-medium">Amount</th>
+                        <th className="pb-2 font-medium">Status</th>
+                        <th className="pb-2 font-medium text-right">Created</th>
+                        <th className="pb-2 font-medium text-right">Released</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {payouts.map(payout => (
+                        <tr key={payout.id} className="py-2">
+                          <td className="py-2 pr-4 font-medium text-gray-800">{formatCents(payout.amount_cents ?? 0)}</td>
+                          <td className="py-2 pr-4">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${payoutStatusColor(payout.status)}`}>
+                              {payout.status}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-4 text-right text-gray-400">{formatDateTime(payout.created_at)}</td>
+                          <td className="py-2 text-right text-gray-400">
+                            {payout.released_at ? formatDateTime(payout.released_at) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      <section className="mb-6 grid gap-4 md:grid-cols-4">
-        <Card><CardContent className="pt-6"><div className="text-3xl font-bold">{formatCents(gross)}</div><div className="text-sm text-gray-500">Gross Completed</div></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-3xl font-bold text-yellow-700">{formatCents(pending)}</div><div className="text-sm text-gray-500">Pending Payout</div></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-3xl font-bold text-red-700">{formatCents(held)}</div><div className="text-sm text-gray-500">Held Payout</div></CardContent></Card>
-        <Card><CardContent className="pt-6"><div className="text-3xl font-bold text-green-700">{formatCents(released)}</div><div className="text-sm text-gray-500">Released</div></CardContent></Card>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Payout History</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {(payouts ?? []).map((payout) => (
-              <div key={payout.id} className="rounded-md border p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{formatCents(payout.amount ?? 0)}</span>
-                  <Badge variant={["payout_hold", "held", "failed"].includes(payout.status) ? "destructive" : "secondary"}>{payout.status}</Badge>
-                </div>
-                <div className="text-xs text-gray-500">{formatDateTime(payout.created_at)}</div>
-              </div>
-            ))}
-            {!payouts?.length && <p className="text-sm text-gray-500">No payout records found.</p>}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Payment Activity</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            {(payments ?? []).map((payment) => (
-              <div key={payment.id} className="rounded-md border p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{formatCents(payment.provider_payout_cents ?? payment.amount_cents ?? 0)}</span>
-                  <Badge variant={payment.status === "failed" ? "destructive" : "secondary"}>{payment.status}</Badge>
-                </div>
-                <div className="text-xs text-gray-500">{payment.type} · {formatDateTime(payment.created_at)}</div>
-              </div>
-            ))}
-            {!payments?.length && <p className="text-sm text-gray-500">No payment records found.</p>}
-          </CardContent>
-        </Card>
-      </section>
-    </main>
+    </div>
   );
 }
