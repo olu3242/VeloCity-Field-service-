@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { loadStripe } from "@stripe/stripe-js";
 import { getEnv, requireEnv } from "@/lib/env";
 import { calculatePlatformFee } from "@/lib/utils";
+import type { PaymentIntentType } from "@/lib/payments/types";
 
 // Server-side Stripe instance
 let stripeClient: Stripe | null = null;
@@ -34,8 +35,9 @@ export async function createPaymentIntent(
   amountCents: number,
   customerId: string,
   jobId: string,
-  type: "deposit" | "final",
-  stripeCustomerId?: string
+  type: PaymentIntentType,
+  stripeCustomerId?: string,
+  tenantId?: string
 ): Promise<Stripe.PaymentIntent> {
   const platformFee = calculatePlatformFee(amountCents);
 
@@ -46,6 +48,7 @@ export async function createPaymentIntent(
     metadata: {
       job_id: jobId,
       customer_id: customerId,
+      tenant_id: tenantId ?? "",
       payment_type: type,
       platform_fee_cents: String(platformFee),
     },

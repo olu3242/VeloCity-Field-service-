@@ -5,6 +5,7 @@ export const AUTOMATION_EVENT_TYPES = [
   "provider_offer_sent",
   "provider_offer_expired",
   "no_provider_accepted",
+  "provider_arrived",
   "job_accepted",
   "job_reassigned",
   "job_state_changed",
@@ -34,9 +35,10 @@ export const AUTOMATION_EVENT_TYPES = [
   "refund_issued",
   "chargeback_opened",
   "sla_breach_detected",
+  "sla_warning",
+  "sla_breach",
   "stuck_job_detected",
   "sla_warn",
-  "sla_breach",
   "sla_escalate",
   "job_stuck",
   "provider_late",
@@ -55,7 +57,8 @@ export const AUTOMATION_EVENT_TYPES = [
   "customer_churn_risk_detected",
   "territory_ready_for_expansion",
   "franchise_candidate_area_detected",
-  "tip_submitted",
+  "cancellation_fee_applied",
+  "provider_penalty_applied",
 ] as const;
 
 export type AutomationEventType = (typeof AUTOMATION_EVENT_TYPES)[number];

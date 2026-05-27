@@ -71,6 +71,13 @@ export const bookingSchema = z.object({
   photo_urls: z.array(z.string().url()).default([]),
 });
 
+export const tenantSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(2).max(120),
+  slug: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/),
+  status: z.enum(["active", "inactive", "suspended"]).default("active"),
+});
+
 export const providerApplicationSchema = z.object({
   business_name: z.string().trim().min(2).max(140),
   business_license: z.string().trim().max(120).optional().nullable(),
@@ -81,6 +88,21 @@ export const providerApplicationSchema = z.object({
   hourly_rate_cents: z.number().int().positive().optional().nullable(),
   bio: z.string().trim().max(2000).optional().nullable(),
   years_experience: z.number().int().min(0).max(80),
+});
+
+export const providerApprovalSchema = z.object({
+  provider_id: z.string().uuid(),
+  action: z.enum(["approve", "reject", "suspend"]),
+  reason: z.string().trim().max(1000).optional(),
+  required_documents_verified: z.boolean().optional(),
+});
+
+export const providerAvailabilitySchema = z.object({
+  provider_id: z.string().uuid(),
+  day_of_week: z.number().int().min(0).max(6),
+  start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+  is_active: z.boolean().default(true),
 });
 
 export const quoteLineItemSchema = z.object({
@@ -97,6 +119,12 @@ export const createQuoteSchema = z.object({
   notes: z.string().trim().max(2000).optional(),
   is_change_order: z.boolean().default(false),
   parent_quote_id: z.string().uuid().optional().nullable(),
+});
+
+export const changeOrderSchema = createQuoteSchema.extend({
+  is_change_order: z.literal(true),
+  parent_quote_id: z.string().uuid(),
+  reason: z.string().trim().min(3).max(1000),
 });
 
 export const quoteActionSchema = z.object({
@@ -122,7 +150,7 @@ export const transitionSchema = z.object({
 export const paymentIntentSchema = z.object({
   job_id: z.string().uuid(),
   amount_cents: z.number().int().positive(),
-  type: z.enum(["deposit", "final"]),
+  type: z.enum(["deposit", "final", "diagnostic", "preauth"]),
 });
 
 export const disputeSchema = z.object({
@@ -137,7 +165,7 @@ export const disputeSchema = z.object({
 export const tipSchema = z.object({
   job_id: z.string().uuid({ message: "job_id must be a valid UUID" }),
   amount_cents: z
-    .number({ error: "amount_cents is required" })
+    .number({ required_error: "amount_cents is required" })
     .int("amount_cents must be an integer")
     .min(100, "Minimum tip is $1.00")
     .max(100_000_00, "Maximum tip is $10,000"),
@@ -168,6 +196,47 @@ export function parseBody<T>(schema: z.ZodSchema<T>, data: unknown):
   const messages = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
   return { success: false, error: messages };
 }
+
+export const reviewCreateSchema = z.object({
+  job_id: z.string().uuid(),
+  reviewee_id: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().trim().max(2000).optional().nullable(),
+});
+
+export const automationProcessSchema = z.object({
+  tenant_id: z.string().uuid().optional(),
+  limit: z.number().int().min(1).max(100).default(25),
+  event_type: z.string().trim().max(120).optional(),
+  retry_failed: z.boolean().default(false),
+});
+
+export const agentRunSchema = z.object({
+  tenant_id: z.string().uuid(),
+  agent_name: z.string().trim().min(2).max(80),
+  input: z.record(z.unknown()).default({}),
+  context: z.record(z.unknown()).default({}),
+});
+
+export const messageCreateSchema = z.object({
+  message: z.string().trim().min(1).max(4000),
+  attachments: z.array(z.record(z.unknown())).default([]),
+});
+
+export const checkInSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  status: z.enum(["arrived", "departed"]).default("arrived"),
+});
+
+export const photoUploadSchema = z.object({
+  photo_type: z.enum(["before", "during", "after", "evidence"]),
+});
+
+export const jobCreateSchema = bookingSchema;
+export const jobTransitionSchema = transitionSchema;
+export const quoteSubmitSchema = createQuoteSchema;
+export const disputeCreateSchema = disputeSchema;
 
 export function validationError(error: unknown) {
   if (error instanceof z.ZodError) {

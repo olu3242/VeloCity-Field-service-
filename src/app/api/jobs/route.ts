@@ -4,6 +4,7 @@ import { alice } from "@/lib/agents/alice";
 import { bookingSchema, validationError } from "@/lib/validation";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
+import { validateServiceArea } from "@/lib/geo/validateServiceArea";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -76,6 +77,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(validationError(parsed.error), { status: 400 });
   }
   const body = parsed.data;
+  const serviceArea = await validateServiceArea({ supabase, tenantId, zip: body.zip });
+  if (!serviceArea.serviceable) {
+    await emitEvent(supabase, {
+      type: "serviceability_failed",
+      source: "api.jobs.create",
+      actorId: user.id,
+      tenantId,
+      dedupKey: `serviceability_failed:${user.id}:${body.zip}:${Date.now()}`,
+      payload: { tenant_id: tenantId, customer_id: user.id, zip: body.zip, reason: serviceArea.reason },
+    });
+    return NextResponse.json({ error: serviceArea.reason }, { status: 422 });
+  }
 
   // ALICE classifies the job
   const classification = await alice.classify(

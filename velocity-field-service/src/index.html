@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VeloCity Field Service — On-Demand Local Professionals</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black: #0a0a0f;
+      --carbon: #111118;
+      --graphite: #1a1a24;
+      --slate: #252533;
+      --border: #2e2e3e;
+      --volt: #c8f135;
+      --amber: #f5a623;
+      --ice: #a8d8f0;
+      --white: #f4f4f0;
+      --muted: #8888a0;
+      --font-display: 'Bebas Neue', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--black);
+      color: var(--white);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── NOISE OVERLAY ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 9999; opacity: 0.5;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 48px; height: 68px;
+      background: rgba(10, 10, 15, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-logo-mark {
+      width: 36px; height: 36px;
+      background: var(--volt);
+      clip-path: polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .nav-logo-mark span {
+      font-family: var(--font-display);
+      font-size: 18px; color: var(--black); line-height: 1;
+    }
+
+    .nav-wordmark {
+      font-family: var(--font-display);
+      font-size: 22px; letter-spacing: 2px;
+      color: var(--white);
+    }
+
+    .nav-wordmark em { color: var(--volt); font-style: normal; }
+
+    .nav-links {
+      display: flex; align-items: center; gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-size: 13px; font-weight: 500; letter-spacing: 0.5px;
+      color: var(--muted); text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--white); }
+
+    .nav-actions { display: flex; align-items: center; gap: 12px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 22px; border-radius: 4px;
+      font-family: var(--font-body); font-size: 13px; font-weight: 600;
+      letter-spacing: 0.3px; text-decoration: none; cursor: pointer;
+      border: none; transition: all 0.2s;
+    }
+
+    .btn-ghost {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { border-color: var(--volt); color: var(--volt); }
+
+    .btn-primary {
+      background: var(--volt); color: var(--black);
+    }
+    .btn-primary:hover { background: #d4ff3d; transform: translateY(-1px); }
+
+    .btn-outline {
+      background: transparent; color: var(--white);
+      border: 1px solid rgba(244,244,240,0.25);
+    }
+    .btn-outline:hover { border-color: var(--volt); color: var(--volt); }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: grid; grid-template-columns: 1fr 1fr;
+      padding-top: 68px;
+      position: relative; overflow: hidden;
+    }
+
+    .hero-bg-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(200,241,53,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(200,241,53,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    .hero-bg-glow {
+      position: absolute;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(200,241,53,0.08) 0%, transparent 70%);
+      top: -100px; left: -100px;
+      pointer-events: none;
+    }
+
+    .hero-left {
+      display: flex; flex-direction: column; justify-content: center;
+      padding: 80px 64px 80px 80px;
+      position: relative; z-index: 2;
+    }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(200,241,53,0.1); border: 1px solid rgba(200,241,53,0.3);
+      border-radius: 2px; padding: 6px 14px;
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--volt); letter-spacing: 1px; width: fit-content;
+      margin-bottom: 32px;
+    }
+
+    .hero-badge::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--volt); animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.3); }
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(56px, 6vw, 88px);
+      line-height: 0.95; letter-spacing: 1px;
+      margin-bottom: 24px;
+    }
+
+    .hero-title .accent { color: var(--volt); }
+    .hero-title .line2 { color: var(--muted); }
+
+    .hero-sub {
+      font-size: 17px; font-weight: 300; color: var(--muted);
+      max-width: 460px; line-height: 1.7; margin-bottom: 48px;
+    }
+
+    .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 60px; }
+
+    .btn-lg { padding: 14px 32px; font-size: 15px; }
+
+    .hero-social {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .hero-social-label {
+      font-size: 11px; color: var(--muted); letter-spacing: 1px;
+      font-family: var(--font-mono); text-transform: uppercase;
+    }
+
+    .social-btns { display: flex; gap: 10px; }
+
+    .social-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 10px 20px; background: var(--graphite);
+      border: 1px solid var(--border); border-radius: 4px;
+      font-size: 13px; font-weight: 500; color: var(--white);
+      text-decoration: none; transition: all 0.2s;
+    }
+
+    .social-btn:hover { border-color: var(--muted); }
+
+    .social-btn svg { width: 16px; height: 16px; }
+
+    /* ── HERO RIGHT ── */
+    .hero-right {
+      position: relative; z-index: 2;
+      display: flex; align-items: center; padding: 80px 48px;
+    }
+
+    .hero-card-stack {
+      position: relative; width: 100%; max-width: 440px; margin: 0 auto;
+    }
+
+    .search-panel {
+      background: var(--graphite);
+      border: 1px solid var(--border);
+      border-radius: 8px; padding: 32px;
+      position: relative; z-index: 3;
+    }
+
+    .search-panel-title {
+      font-family: var(--font-display); font-size: 20px;
+      letter-spacing: 1.5px; margin-bottom: 24px;
+      color: var(--white);
+    }
+
+    .search-input-wrap {
+      position: relative; margin-bottom: 16px;
+    }
+
+    .search-input {
+      width: 100%; padding: 14px 16px 14px 44px;
+      background: var(--slate); border: 1px solid var(--border);
+      border-radius: 4px; color: var(--white);
+      font-family: var(--font-body); font-size: 14px;
+      outline: none; transition: border-color 0.2s;
+    }
+
+    .search-input:focus { border-color: var(--volt); }
+    .search-input::placeholder { color: var(--muted); }
+
+    .search-icon {
+      position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      color: var(--muted);
+    }
+
+    .category-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-bottom: 20px;
+    }
+
+    .cat-chip {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; background: var(--slate);
+      border: 1px solid var(--border); border-radius: 4px;
+      font-size: 12px; font-weight: 500; color: var(--muted);
+      cursor: pointer; transition: all 0.2s;
+    }
+
+    .cat-chip:hover, .cat-chip.active {
+      border-color: var(--volt); color: var(--volt);
+      background: rgba(200,241,53,0.05);
+    }
+
+    .cat-chip-icon { font-size: 16px; }
+
+    .btn-book {
+      width: 100%; padding: 14px;
+      background: var(--volt); color: var(--black);
+      font-weight: 700; font-size: 15px; letter-spacing: 0.5px;
+      border: none; border-radius: 4px; cursor: pointer;
+      font-family: var(--font-body); transition: all 0.2s;
+    }
+
+    .btn-book:hover { background: #d4ff3d; transform: translateY(-1px); }
+
+    /* Floating status cards */
+    .float-card {
+      position: absolute; background: var(--graphite);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+      font-size: 12px;
+    }
+
+    .float-card-1 {
+      bottom: -32px; left: -48px; z-index: 2;
+      animation: float1 4s ease-in-out infinite;
+    }
+
+    .float-card-2 {
+      top: -24px; right: -24px; z-index: 4;
+      animation: float2 5s ease-in-out infinite;
+    }
+
+    @keyframes float1 {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @keyframes float2 {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px); }
+    }
+
+    .float-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--volt), var(--amber));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px; color: var(--black);
+    }
+
+    .float-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #22c55e;
+      flex-shrink: 0;
+    }
+
+    .float-text strong { display: block; font-weight: 600; color: var(--white); }
+    .float-text span { color: var(--muted); font-size: 11px; }
+
+    /* ── STATS BAR ── */
+    .stats-bar {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--carbon);
+      display: grid; grid-template-columns: repeat(4, 1fr);
+    }
+
+    .stat-item {
+      padding: 32px 40px;
+      border-right: 1px solid var(--border);
+      position: relative; overflow: hidden;
+    }
+
+    .stat-item:last-child { border-right: none; }
+
+    .stat-item::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--volt), transparent);
+      opacity: 0; transition: opacity 0.3s;
+    }
+
+    .stat-item:hover::before { opacity: 1; }
+
+    .stat-number {
+      font-family: var(--font-display); font-size: 48px;
+      color: var(--volt); line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-label {
+      font-size: 12px; color: var(--muted);
+      font-family: var(--font-mono); letter-spacing: 0.5px;
+    }
+
+    /* ── SECTION SHARED ── */
+    .section { padding: 100px 80px; }
+    .section-tag {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--volt); letter-spacing: 2px; text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      font-family: var(--font-display); font-size: clamp(36px, 4vw, 56px);
+      line-height: 1.0; margin-bottom: 16px;
+    }
+    .section-sub { font-size: 16px; color: var(--muted); max-width: 520px; }
+
+    .section-header { margin-bottom: 64px; }
+
+    /* ── SERVICES GRID ── */
+    .services { background: var(--carbon); }
+
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px; background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .service-card {
+      background: var(--graphite);
+      padding: 36px 32px; position: relative;
+      overflow: hidden; cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .service-card::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+      background: var(--volt);
+      transform: scaleX(0); transform-origin: left;
+      transition: transform 0.3s;
+    }
+
+    .service-card:hover { background: var(--slate); }
+    .service-card:hover::after { transform: scaleX(1); }
+
+    .service-icon {
+      width: 52px; height: 52px; margin-bottom: 20px;
+      background: rgba(200,241,53,0.08);
+      border: 1px solid rgba(200,241,53,0.2);
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+    }
+
+    .service-name {
+      font-family: var(--font-display); font-size: 22px;
+      letter-spacing: 0.5px; margin-bottom: 10px;
+    }
+
+    .service-desc {
+      font-size: 13px; color: var(--muted); line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .service-price {
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--volt); letter-spacing: 1px;
+    }
+
+    .service-arrow {
+      position: absolute; top: 32px; right: 32px;
+      font-size: 20px; color: var(--border);
+      transition: color 0.3s, transform 0.3s;
+    }
+
+    .service-card:hover .service-arrow {
+      color: var(--volt); transform: translate(4px, -4px);
+    }
+
+    /* ── WHY VELOCITY ── */
+    .why { background: var(--black); }
+
+    .why-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+    }
+
+    .why-card {
+      padding: 36px 32px;
+      border: 1px solid var(--border);
+      border-radius: 4px; position: relative;
+      transition: border-color 0.3s;
+    }
+
+    .why-card:hover { border-color: rgba(200,241,53,0.4); }
+
+    .why-num {
+      font-family: var(--font-display); font-size: 72px;
+      color: rgba(200,241,53,0.08); line-height: 1;
+      position: absolute; top: 16px; right: 24px;
+    }
+
+    .why-icon { font-size: 28px; margin-bottom: 20px; }
+
+    .why-title {
+      font-family: var(--font-display); font-size: 20px;
+      letter-spacing: 0.5px; margin-bottom: 12px;
+    }
+
+    .why-desc { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+    /* ── AI AGENTS SECTION ── */
+    .agents-section { background: var(--carbon); overflow: hidden; }
+
+    .agents-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+
+    .agents-visual {
+      position: relative; height: 520px;
+    }
+
+    .agent-hub {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100px; height: 100px;
+      background: var(--volt);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 5;
+    }
+
+    .agent-hub span {
+      font-family: var(--font-display); font-size: 18px; color: var(--black);
+    }
+
+    .orbit-ring {
+      position: absolute; top: 50%; left: 50%;
+      width: 340px; height: 340px;
+      margin: -170px 0 0 -170px;
+      border: 1px dashed rgba(200,241,53,0.2);
+      border-radius: 50%;
+      animation: spin 30s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .agent-node {
+      position: absolute;
+      width: 72px; height: 72px;
+      background: var(--graphite);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 2px;
+      font-size: 20px;
+      transition: border-color 0.3s;
+    }
+
+    .agent-node:hover { border-color: var(--volt); }
+
+    .agent-node-label {
+      font-family: var(--font-mono); font-size: 8px;
+      color: var(--volt); letter-spacing: 0.5px;
+    }
+
+    /* Position agents on the ring */
+    .an-1 { top: -36px; left: calc(50% - 36px); }
+    .an-2 { top: calc(21% - 36px); right: -12px; }
+    .an-3 { top: calc(75% - 36px); right: -12px; }
+    .an-4 { bottom: -36px; left: calc(50% - 36px); }
+    .an-5 { top: calc(75% - 36px); left: -12px; }
+    .an-6 { top: calc(21% - 36px); left: -12px; }
+
+    .agents-list { display: flex; flex-direction: column; gap: 16px; }
+
+    .agent-item {
+      display: flex; align-items: flex-start; gap: 16px;
+      padding: 20px 24px;
+      border: 1px solid var(--border); border-radius: 4px;
+      transition: border-color 0.3s, background 0.3s;
+      cursor: pointer;
+    }
+
+    .agent-item:hover {
+      border-color: rgba(200,241,53,0.3);
+      background: rgba(200,241,53,0.03);
+    }
+
+    .agent-avatar {
+      width: 40px; height: 40px; flex-shrink: 0;
+      background: var(--slate); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; border: 1px solid var(--border);
+    }
+
+    .agent-info strong {
+      display: block; font-size: 14px; font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .agent-info span { font-size: 12px; color: var(--muted); }
+
+    /* ── HOW IT WORKS ── */
+    .how { background: var(--black); }
+
+    .steps-row {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 0; position: relative;
+    }
+
+    .steps-row::before {
+      content: '';
+      position: absolute; top: 40px; left: 10%; right: 10%; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--volt), var(--volt), transparent);
+      opacity: 0.3;
+    }
+
+    .step-item { padding: 20px 24px; position: relative; }
+
+    .step-num {
+      width: 48px; height: 48px;
+      background: var(--graphite);
+      border: 2px solid var(--volt);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display); font-size: 20px;
+      color: var(--volt); margin-bottom: 20px; position: relative; z-index: 2;
+    }
+
+    .step-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+    .step-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    /* ── TRUST SECTION ── */
+    .trust { background: var(--graphite); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+    .trust-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 32px;
+    }
+
+    .trust-item { display: flex; align-items: center; gap: 12px; }
+
+    .trust-icon {
+      width: 40px; height: 40px; background: rgba(200,241,53,0.1);
+      border: 1px solid rgba(200,241,53,0.2); border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+
+    .trust-text strong { display: block; font-size: 14px; font-weight: 600; }
+    .trust-text span { font-size: 12px; color: var(--muted); }
+
+    /* ── CTA SECTION ── */
+    .cta-section {
+      background: var(--black); text-align: center;
+      padding: 120px 80px; position: relative; overflow: hidden;
+    }
+
+    .cta-glow {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px; height: 400px;
+      background: radial-gradient(ellipse, rgba(200,241,53,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .cta-section .section-title { font-size: clamp(40px, 5vw, 72px); }
+    .cta-section .section-sub { margin: 24px auto 48px; text-align: center; }
+
+    .cta-btns { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--carbon); border-top: 1px solid var(--border);
+      padding: 64px 80px 40px;
+    }
+
+    .footer-top {
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      gap: 48px; margin-bottom: 64px;
+    }
+
+    .footer-brand p {
+      font-size: 14px; color: var(--muted); margin-top: 16px;
+      max-width: 240px; line-height: 1.7;
+    }
+
+    .footer-col h4 {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--volt); letter-spacing: 2px; text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-col ul a {
+      font-size: 13px; color: var(--muted); text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-col ul a:hover { color: var(--white); }
+
+    .footer-bottom {
+      border-top: 1px solid var(--border); padding-top: 32px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .footer-bottom p { font-size: 12px; color: var(--muted); }
+
+    .footer-mono { font-family: var(--font-mono); font-size: 11px; color: rgba(200,241,53,0.5); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1024px) {
+      nav { padding: 0 24px; }
+      .nav-links { display: none; }
+      .hero { grid-template-columns: 1fr; min-height: auto; }
+      .hero-left { padding: 60px 32px 40px; }
+      .hero-right { padding: 40px 32px 60px; }
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .section { padding: 72px 32px; }
+      .services-grid { grid-template-columns: repeat(2, 1fr); }
+      .why-grid { grid-template-columns: 1fr 1fr; }
+      .agents-layout { grid-template-columns: 1fr; }
+      .agents-visual { display: none; }
+      .steps-row { grid-template-columns: repeat(2, 1fr); }
+      .footer-top { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 600px) {
+      .services-grid { grid-template-columns: 1fr; }
+      .why-grid { grid-template-columns: 1fr; }
+      .stats-bar { grid-template-columns: 1fr 1fr; }
+      .steps-row { grid-template-columns: 1fr; }
+      .footer-top { grid-template-columns: 1fr; }
+      .hero-title { font-size: 52px; }
+    }
+
+    /* ── ANIMATIONS ── */
+    .fade-in {
+      opacity: 0; transform: translateY(24px);
+      animation: fadeUp 0.6s ease forwards;
+    }
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .delay-1 { animation-delay: 0.1s; }
+    .delay-2 { animation-delay: 0.2s; }
+    .delay-3 { animation-delay: 0.3s; }
+    .delay-4 { animation-delay: 0.4s; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="nav-logo-mark"><span>V</span></div>
+    <span class="nav-wordmark">VELO<em>CITY</em></span>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#services">Home Services</a></li>
+    <li><a href="#providers">Providers</a></li>
+    <li><a href="#areas">Service Areas</a></li>
+    <li><a href="#agents">AI Agents</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+  </ul>
+  <div class="nav-actions">
+    <a href="#" class="btn btn-ghost">Sign In</a>
+    <a href="#" class="btn btn-primary">Book Service</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg-grid"></div>
+  <div class="hero-bg-glow"></div>
+
+  <div class="hero-left">
+    <div class="hero-badge fade-in">⚡ REAL-TIME FIELD SERVICE DISPATCH</div>
+
+    <h1 class="hero-title fade-in delay-1">
+      YOUR LOCAL<br>
+      <span class="accent">SERVICE,</span><br>
+      <span class="line2">AT VELOCITY.</span>
+    </h1>
+
+    <p class="hero-sub fade-in delay-2">
+      Book verified local professionals for plumbing, electrical, HVAC, cleaning, handyman work, and emergency home services — powered by AI dispatch.
+    </p>
+
+    <div class="hero-ctas fade-in delay-3">
+      <a href="#" class="btn btn-primary btn-lg">⚡ Book a Service</a>
+      <a href="#" class="btn btn-outline btn-lg">Become a Provider →</a>
+    </div>
+
+    <div class="hero-social fade-in delay-4">
+      <span class="hero-social-label">Continue with</span>
+      <div class="social-btns">
+        <a href="#" class="social-btn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Google
+        </a>
+        <a href="#" class="social-btn">
+          <svg viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          Facebook
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- HERO RIGHT: Booking Panel -->
+  <div class="hero-right">
+    <div class="hero-card-stack">
+
+      <div class="float-card float-card-2">
+        <div class="float-dot"></div>
+        <div class="float-text">
+          <strong>Marcus R. — En Route</strong>
+          <span>ETA 12 min · Plumbing</span>
+        </div>
+      </div>
+
+      <div class="search-panel">
+        <p class="search-panel-title">BOOK A SERVICE</p>
+
+        <div class="search-input-wrap">
+          <span class="search-icon">📍</span>
+          <input type="text" class="search-input" placeholder="City, area, ZIP code, or service need" />
+        </div>
+
+        <div class="category-grid">
+          <div class="cat-chip active"><span class="cat-chip-icon">🔧</span> Plumbing</div>
+          <div class="cat-chip"><span class="cat-chip-icon">⚡</span> Electrical</div>
+          <div class="cat-chip"><span class="cat-chip-icon">❄️</span> HVAC / AC</div>
+          <div class="cat-chip"><span class="cat-chip-icon">🏠</span> Cleaning</div>
+          <div class="cat-chip"><span class="cat-chip-icon">🔨</span> Handyman</div>
+          <div class="cat-chip"><span class="cat-chip-icon">🌿</span> Lawn Care</div>
+        </div>
+
+        <button class="btn-book">⚡ Find Providers Near Me</button>
+      </div>
+
+      <div class="float-card float-card-1">
+        <div class="float-avatar">JT</div>
+        <div class="float-text">
+          <strong>Job Completed ✓</strong>
+          <span>AC Repair · $220 · 4.9 ⭐</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-number">48</div>
+    <div class="stat-label">Active Jobs Today</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number">12</div>
+    <div class="stat-label">Service Categories</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number">85+</div>
+    <div class="stat-label">Verified Providers</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-number">10K+</div>
+    <div class="stat-label">Completed Services</div>
+  </div>
+</div>
+
+<!-- FEATURED SERVICES -->
+<section id="services" class="section services">
+  <div class="section-header">
+    <div class="section-tag">// SERVICES</div>
+    <h2 class="section-title">Featured Services<br><span style="color:var(--muted)">Near You</span></h2>
+    <p class="section-sub">Professional, verified, and dispatched in real-time by our AI matching engine.</p>
+  </div>
+  <div class="services-grid">
+    <div class="service-card">
+      <div class="service-icon">🔧</div>
+      <div class="service-arrow">↗</div>
+      <div class="service-name">PLUMBING REPAIR</div>
+      <div class="service-desc">Leaks, clogged drains, pipe repairs, faucet installs, toilet repairs, and emergency water shutoffs.</div>
+      <div class="service-price">FROM $75 · SAME DAY AVAILABLE</div>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">⚡</div>
+      <div class="service-arrow">↗</div>
+      <div class="service-name">ELECTRICAL</div>
+      <div class="service-desc">Wiring, outlets, lighting, breaker issues, panel upgrades, and EV charger installations.</div>
+      <div class="service-price">FROM $90 · LICENSED PROS</div>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">❄️</div>
+      <div class="service-arrow">↗</div>
+      <div class="service-name">HVAC / AC REPAIR</div>
+      <div class="service-desc">AC not cooling, system tune-ups, filter replacement, diagnostics, and seasonal maintenance.</div>
+      <div class="service-price">FROM $120 · CERTIFIED TECHS</div>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">🏠</div>
+      <div class="service-arrow">↗</div>
+      <div class="service-name">HOME CLEANING</div>
+      <div class="service-desc">Deep cleaning, move-in/move-out, recurring weekly or bi-weekly home cleaning services.</div>
+      <div class="service-price">FROM $65 · RECURRING PLANS</div>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">🔨</div>
+      <div class="service-arrow">↗</div>
+      <div class="service-name">HANDYMAN</div>
+      <div class="service-desc">TV mounting, furniture assembly, drywall patching, minor repairs, and general home fixes.</div>
+      <div class="service-price">FROM $50 · SAME DAY</div>
+    </div>
+    <div class="service-card">
+      <div class="service-icon">🌿</div>
+      <div class="service-arrow">↗</div>
+      <div class="service-name">LAWN CARE</div>
+      <div class="service-desc">Mowing, edging, trimming, seasonal cleanup, leaf removal, and landscaping maintenance.</div>
+      <div class="service-price">FROM $60 · WEEKLY PLANS</div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY VELOCITY -->
+<section class="section why">
+  <div class="section-header">
+    <div class="section-tag">// WHY CHOOSE US</div>
+    <h2 class="section-title">Why Choose<br><span style="color:var(--volt)">VeloCity?</span></h2>
+    <p class="section-sub">We make local field service fast, trusted, trackable, and stress-free.</p>
+  </div>
+  <div class="why-grid">
+    <div class="why-card">
+      <div class="why-num">01</div>
+      <div class="why-icon">✅</div>
+      <div class="why-title">VERIFIED PROVIDERS</div>
+      <div class="why-desc">Every technician is background-checked, license-verified, and rated by real customers before joining the platform.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">02</div>
+      <div class="why-icon">⚡</div>
+      <div class="why-title">JUST-IN-TIME DISPATCH</div>
+      <div class="why-desc">Our AI matches you with the right provider based on location, urgency, skill, availability, and trust score.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">03</div>
+      <div class="why-icon">💰</div>
+      <div class="why-title">TRANSPARENT PRICING</div>
+      <div class="why-desc">See estimates, quotes, and change orders before any work begins. No surprise charges, ever.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">04</div>
+      <div class="why-icon">📡</div>
+      <div class="why-title">REAL-TIME TRACKING</div>
+      <div class="why-desc">Track your provider from accepted → en route → arrived → in progress → completed in live status.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">05</div>
+      <div class="why-icon">🔒</div>
+      <div class="why-title">SECURE PAYMENTS</div>
+      <div class="why-desc">Deposits, escrow holds, full payments, refunds, and payouts — all handled safely on the platform.</div>
+    </div>
+    <div class="why-card">
+      <div class="why-num">06</div>
+      <div class="why-icon">🤖</div>
+      <div class="why-title">AI QUALITY CONTROL</div>
+      <div class="why-desc">Our AI monitors service outcomes, provider reliability, SLA breaches, and disputes in real time.</div>
+    </div>
+  </div>
+</section>
+
+<!-- AI AGENTS -->
+<section id="agents" class="section agents-section">
+  <div class="agents-layout">
+    <div>
+      <div class="section-tag">// AI OS</div>
+      <h2 class="section-title">10 Specialized<br><span style="color:var(--volt)">AI Agents</span></h2>
+      <p class="section-sub" style="margin-bottom: 40px;">
+        VeloCity runs on a full AI Operating System — a team of intelligent agents that manage intake, dispatch, pricing, quality, disputes, payments, and retention.
+      </p>
+      <div class="agents-list">
+        <div class="agent-item"><div class="agent-avatar">🎙</div><div class="agent-info"><strong>ALICE — Intake Agent</strong><span>Customer intake, urgency detection, service classification</span></div></div>
+        <div class="agent-item"><div class="agent-avatar">📡</div><div class="agent-info"><strong>MAX — Dispatch Agent</strong><span>Provider matching, geo-ranking, SLA-aware assignment</span></div></div>
+        <div class="agent-item"><div class="agent-avatar">💬</div><div class="agent-info"><strong>QUINN — Quote Agent</strong><span>Pricing guidance, overcharge detection, change orders</span></div></div>
+        <div class="agent-item"><div class="agent-avatar">🔄</div><div class="agent-info"><strong>NOVA — Workflow Agent</strong><span>Status tracking, reminders, workflow orchestration</span></div></div>
+        <div class="agent-item"><div class="agent-avatar">🛡</div><div class="agent-info"><strong>REX — Quality Agent</strong><span>Trust scoring, reliability monitoring, risk alerts</span></div></div>
+        <div class="agent-item"><div class="agent-avatar">⚖️</div><div class="agent-info"><strong>IVY — Dispute Agent</strong><span>Evidence review, mediation, resolution recommendations</span></div></div>
+      </div>
+    </div>
+    <div class="agents-visual">
+      <div class="orbit-ring"></div>
+      <div class="agent-hub"><span>V·OS</span></div>
+      <div class="agent-node an-1">🎙<span class="agent-node-label">ALICE</span></div>
+      <div class="agent-node an-2">📡<span class="agent-node-label">MAX</span></div>
+      <div class="agent-node an-3">💬<span class="agent-node-label">QUINN</span></div>
+      <div class="agent-node an-4">🔄<span class="agent-node-label">NOVA</span></div>
+      <div class="agent-node an-5">🛡<span class="agent-node-label">REX</span></div>
+      <div class="agent-node an-6">⚖️<span class="agent-node-label">IVY</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section how">
+  <div class="section-header">
+    <div class="section-tag">// HOW IT WORKS</div>
+    <h2 class="section-title">From Request to<br><span style="color:var(--volt)">Completion</span></h2>
+  </div>
+  <div class="steps-row">
+    <div class="step-item">
+      <div class="step-num">1</div>
+      <div class="step-title">Search & Select</div>
+      <div class="step-desc">Enter your location and choose your service category or describe your need.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">2</div>
+      <div class="step-title">AI Matches</div>
+      <div class="step-desc">VeloCity AI finds the best available provider near you by skill, rating, and response time.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">3</div>
+      <div class="step-title">Track Live</div>
+      <div class="step-desc">Watch your provider's status in real time: accepted, en route, arrived, in progress.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">4</div>
+      <div class="step-title">Approve & Pay</div>
+      <div class="step-desc">Review the quote, approve work, and pay securely — all within the platform.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">5</div>
+      <div class="step-title">Rate & Rebook</div>
+      <div class="step-desc">Leave a review and get AI-powered reminders for recurring maintenance needs.</div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST BAR -->
+<div class="trust section" style="padding: 48px 80px;">
+  <div class="trust-inner">
+    <div class="trust-item"><div class="trust-icon">🔒</div><div class="trust-text"><strong>Secure Escrow</strong><span>Funds held until job complete</span></div></div>
+    <div class="trust-item"><div class="trust-icon">📋</div><div class="trust-text"><strong>Licensed & Insured</strong><span>All providers verified</span></div></div>
+    <div class="trust-item"><div class="trust-icon">⚡</div><div class="trust-text"><strong>Same-Day Available</strong><span>Emergency dispatch ready</span></div></div>
+    <div class="trust-item"><div class="trust-icon">🌟</div><div class="trust-text"><strong>4.9 Avg Rating</strong><span>Across 10,000+ reviews</span></div></div>
+    <div class="trust-item"><div class="trust-icon">🔄</div><div class="trust-text"><strong>Satisfaction Guarantee</strong><span>We make it right</span></div></div>
+  </div>
+</div>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-glow"></div>
+  <div class="section-tag" style="margin-bottom: 24px;">// GET STARTED TODAY</div>
+  <h2 class="section-title">Ready for <span style="color:var(--volt)">Velocity?</span></h2>
+  <p class="section-sub">Join thousands of customers and providers on the platform built for local field service excellence.</p>
+  <div class="cta-btns">
+    <a href="#" class="btn btn-primary btn-lg">⚡ Book Your First Service</a>
+    <a href="#" class="btn btn-outline btn-lg">Become a Provider →</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <a href="#" class="nav-logo" style="margin-bottom: 0;">
+        <div class="nav-logo-mark"><span>V</span></div>
+        <span class="nav-wordmark">VELO<em>CITY</em></span>
+      </a>
+      <p>Your one-stop platform for trusted local field service delivery — powered by AI dispatch and specialized agents.</p>
+    </div>
+    <div class="footer-col">
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="#">Home Services</a></li>
+        <li><a href="#">Providers</a></li>
+        <li><a href="#">Service Areas</a></li>
+        <li><a href="#">Community</a></li>
+        <li><a href="#">Pricing</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Partner Portal</h4>
+      <ul>
+        <li><a href="#">Become a Provider</a></li>
+        <li><a href="#">Provider Dashboard</a></li>
+        <li><a href="#">Business Solutions</a></li>
+        <li><a href="#">Territory Operators</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>AI System</h4>
+      <ul>
+        <li><a href="#">ALICE — Intake</a></li>
+        <li><a href="#">MAX — Dispatch</a></li>
+        <li><a href="#">QUINN — Quotes</a></li>
+        <li><a href="#">REX — Quality</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Support</h4>
+      <ul>
+        <li><a href="#">Help Center</a></li>
+        <li><a href="#">Contact Us</a></li>
+        <li><a href="#">Terms of Service</a></li>
+        <li><a href="#">Privacy Policy</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2026 VeloCity Field Service. All rights reserved.</p>
+    <span class="footer-mono">V·OS ACTIVE · AI DISPATCH ONLINE ●</span>
+  </div>
+</footer>
+
+<script>
+  // Category chips
+  document.querySelectorAll('.cat-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+
+  // Intersection observer for animations
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.style.opacity = '1';
+        entry.target.style.transform = 'translateY(0)';
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.service-card, .why-card, .agent-item, .step-item').forEach(el => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    observer.observe(el);
+  });
+</script>
+
+</body>
+</html>

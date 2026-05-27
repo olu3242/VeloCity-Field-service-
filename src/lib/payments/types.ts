@@ -13,6 +13,8 @@ export type PaymentAutomationState =
   | "payment_failed"
   | "chargeback_opened";
 
+export type PaymentIntentType = "deposit" | "final" | "diagnostic" | "preauth";
+
 export interface PaymentContext {
   tenantId: string;
   jobId?: string;

@@ -5,6 +5,7 @@ import { getTenantId } from "@/lib/tenancy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AutomationQueueList, RelatedList } from "@/components/related-lists";
 import { formatDateTime } from "@/lib/utils";
 
 export default async function AdminAutomationLogsPage() {
@@ -86,6 +87,12 @@ export default async function AdminAutomationLogsPage() {
             {!logs?.length && <p className="text-sm text-gray-500">No agent logs found.</p>}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="mt-6 grid gap-4 lg:grid-cols-3">
+        <AutomationQueueList tenantId={tenantId} />
+        <RelatedList title="Automation Events" table="automation_events" tenantId={tenantId} primaryColumn="event_type" statusColumn="status" secondaryColumn="source" />
+        <RelatedList title="Agent Logs" table="agent_logs" tenantId={tenantId} primaryColumn="agent_name" statusColumn="action" secondaryColumn="error" />
       </section>
     </main>
   );

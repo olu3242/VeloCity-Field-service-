@@ -6,6 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { QuoteActions } from "@/components/jobs/quote-actions";
 import { TipProvider } from "@/components/jobs/tip-provider";
+import { MessagePanel } from "@/components/jobs/message-panel";
+import { PhotoUploadForm } from "@/components/jobs/photo-upload-form";
+import { getSlaStatus } from "@/lib/sla/slaStatus";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -45,6 +48,13 @@ export default async function JobDetailPage({
 
   const progress = getJobProgressPercent(job.status as Job["status"]);
   const latestQuote = job.quotes?.[job.quotes.length - 1];
+  const [{ data: photos }, { data: messages }, { data: checkins }, { data: receipts }] = await Promise.all([
+    supabase.from("job_photos").select("*").eq("tenant_id", job.tenant_id).eq("job_id", job.id).order("created_at", { ascending: false }),
+    supabase.from("job_messages").select("*").eq("tenant_id", job.tenant_id).eq("job_id", job.id).order("created_at", { ascending: true }),
+    supabase.from("job_checkins").select("*").eq("tenant_id", job.tenant_id).eq("job_id", job.id).order("created_at", { ascending: false }),
+    supabase.from("receipts").select("*").eq("tenant_id", job.tenant_id).eq("job_id", job.id).order("created_at", { ascending: false }),
+  ]);
+  const sla = getSlaStatus(job);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -114,6 +124,45 @@ export default async function JobDetailPage({
               </CardContent>
             </Card>
 
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader><CardTitle>SLA & Arrival</CardTitle></CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <Badge variant={sla.breached ? "destructive" : sla.warning ? "warning" : "secondary"}>{sla.label}</Badge>
+                  <div className="text-gray-500">Arrival deadline: {formatDateTime(sla.deadline)}</div>
+                  {checkins?.[0] && (
+                    <div className="rounded-md border p-3">
+                      Provider arrived {formatDateTime(checkins[0].created_at)}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Upload Evidence</CardTitle></CardHeader>
+                <CardContent>
+                  <PhotoUploadForm jobId={job.id} />
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader><CardTitle>Job Photos</CardTitle></CardHeader>
+              <CardContent className="grid gap-2 sm:grid-cols-2">
+                {(photos ?? []).map((photo) => (
+                  <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer" className="rounded-md border p-3 text-sm hover:border-velocity-300">
+                    <div className="font-medium capitalize">{photo.photo_type}</div>
+                    <div className="text-xs text-gray-500">{formatDateTime(photo.created_at)}</div>
+                  </a>
+                ))}
+                {!photos?.length && <p className="text-sm text-gray-500">No job photos uploaded yet.</p>}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Job Chat</CardTitle></CardHeader>
+              <CardContent><MessagePanel jobId={job.id} messages={messages ?? []} /></CardContent>
+            </Card>
+
             {/* Quote */}
             {latestQuote && (
               <Card>
@@ -174,6 +223,20 @@ export default async function JobDetailPage({
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {(receipts?.length ?? 0) > 0 && (
+              <Card>
+                <CardHeader><CardTitle>Receipts</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  {(receipts ?? []).map((receipt) => (
+                    <div key={receipt.id} className="flex justify-between rounded-md border p-3 text-sm">
+                      <span>{formatDateTime(receipt.created_at)}</span>
+                      <span className="font-medium">{formatCents(receipt.amount)}</span>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             )}
