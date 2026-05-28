@@ -1,0 +1,23 @@
+export const routes = {
+  home: "/",
+  services: "/services",
+  book: "/book",
+  providers: "/providers",
+  providerApply: "/provider/apply",
+  providerDashboard: "/provider/dashboard",
+  dashboard: "/dashboard",
+  login: "/auth/login",
+  signup: "/auth/signup",
+  pricing: "/pricing",
+  support: "/support",
+  serviceAreas: "/service-areas",
+  community: "/community",
+  businessSolutions: "/business-solutions",
+  territoryOperators: "/territory-operators",
+  ai: {
+    alice: "/ai/alice",
+    max: "/ai/max",
+    quinn: "/ai/quinn",
+    rex: "/ai/rex",
+  },
+} as const;
