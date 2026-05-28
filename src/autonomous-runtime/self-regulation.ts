@@ -122,11 +122,5 @@ export function getRegulationSummary(): {
 } {
   const activeRules = Array.from(RULES.values()).filter((r) => r.active).length
   const reverted = EVENTS.filter((e) => e.status === "reverted").length
-  const revertRate = EVENTS.length > 0 ? reverted / EVENTS.length : 0
-  return {
-    totalRules: RULES.size,
-    activeRules,
-    totalEvents: EVENTS.length,
-    revertRate,
-  }
+  return { totalRules: RULES.size, activeRules, totalEvents: EVENTS.length, revertRate: EVENTS.length > 0 ? reverted / EVENTS.length : 0 }
 }
