@@ -42,7 +42,9 @@ export function startNodeExecution(
   tenantId?: string
 ): NodeExecution {
   if (isRuntimePaused()) {
-    logger.warn("startNodeExecution blocked — runtime paused", "execution-tracker", { workflowId, nodeId })
+    logger.warn("startNodeExecution blocked — runtime paused", "execution-tracker", {
+      metadata: { workflowId, nodeId },
+    })
     throw new Error("Runtime is paused")
   }
   while (totalEntries() >= TOTAL_CAP) evictOldestEntry()

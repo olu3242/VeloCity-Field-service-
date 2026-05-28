@@ -5,4 +5,13 @@ export * from "./execution-learning"
 export * from "./mutation-governance"
 export * from "./workflow-tuning"
 export * from "./runtime-adaptation"
-export * from "./orchestration-evolution"
+export {
+  beginEvolutionCycle,
+  completeEvolutionCycle,
+  getActiveCycles,
+  getEvolutionSummary as getOrchestrationEvolutionSummary,
+  recordAdaptationApplied,
+  recordMutationApplied,
+  rollbackEvolutionCycle,
+  type EvolutionCycle,
+} from "./orchestration-evolution"

@@ -72,7 +72,9 @@ export function compileGraph(
   options?: { tenantId?: string }
 ): WorkflowGraph {
   if (isRuntimePaused()) {
-    logger.warn("compileGraph blocked — runtime paused", "graph-compiler", { workflowId })
+    logger.warn("compileGraph blocked — runtime paused", "graph-compiler", {
+      metadata: { workflowId },
+    })
     throw new Error("Runtime is paused")
   }
   while (GRAPHS.size >= CAP) {
@@ -94,7 +96,9 @@ export function recompileGraph(
   edgeConfigs: EdgeConfig[]
 ): WorkflowGraph {
   if (isRuntimePaused()) {
-    logger.warn("recompileGraph blocked — runtime paused", "graph-compiler", { workflowId })
+    logger.warn("recompileGraph blocked — runtime paused", "graph-compiler", {
+      metadata: { workflowId },
+    })
     throw new Error("Runtime is paused")
   }
   const existing = GRAPHS.get(workflowId)
