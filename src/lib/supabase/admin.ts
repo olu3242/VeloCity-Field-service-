@@ -4,6 +4,7 @@
 // are not yet in the generated types and we can't run supabase gen types
 // against placeholder credentials.
 import { createClient } from "@supabase/supabase-js";
+import { env } from "@/config/env";
 
 type AdminClient = ReturnType<typeof createClient<any>>;
 
@@ -12,10 +13,10 @@ let _adminClient: AdminClient | null = null;
 export function getAdminClient(): AdminClient {
   if (_adminClient) return _adminClient;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = env.supabase.url;
+  const key = env.supabase.serviceRoleKey;
 
-  if (!url || !key || url.includes("placeholder") || key.includes("placeholder")) {
+  if (!url || !key) {
     throw new Error("Supabase service role credentials not configured");
   }
 

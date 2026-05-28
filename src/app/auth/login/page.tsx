@@ -2,18 +2,21 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BrandWordmark, VelocityBadge, VelocityCard, VelocityGlow, VelocityLoader } from "@/components/branding";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(searchParams?.get("error") ?? null);
+  const next = searchParams?.get("next") ?? "/dashboard";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -38,7 +41,7 @@ export default function LoginPage() {
 
     if (profile?.role === "admin") router.push("/admin/dashboard");
     else if (profile?.role === "provider") router.push("/provider/dashboard");
-    else router.push("/dashboard");
+    else router.push(next);
   }
 
   async function handleGoogleLogin() {
@@ -47,7 +50,9 @@ export default function LoginPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback`,
+      },
     });
     if (error) {
       setError(error.message);
@@ -56,15 +61,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="velocity-shell relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+      <VelocityGlow className="-left-24 top-10 size-80" />
+      <VelocityGlow className="-right-24 bottom-0 size-96 bg-velocity-ice/10" />
+      {loading && <VelocityLoader className="absolute inset-0 z-20 min-h-screen bg-velocity-black/92 backdrop-blur-sm" label="AUTHORIZING SESSION" />}
+      <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold text-velocity-700">⚡ VeloCity</Link>
-          <h1 className="mt-4 text-2xl font-semibold text-gray-900">Welcome back</h1>
-          <p className="text-gray-500 mt-1">Sign in to your account</p>
+          <BrandWordmark className="justify-center" />
+          <VelocityBadge className="mx-auto mt-6">SECURE ACCESS</VelocityBadge>
+          <h1 className="mt-4 text-4xl text-velocity-white">Welcome back</h1>
+          <p className="text-velocity-muted mt-1">Sign in to your command center</p>
         </div>
 
-        <div className="bg-white rounded-xl border p-8 shadow-sm">
+        <VelocityCard className="p-8">
           <Button
             onClick={handleGoogleLogin}
             variant="outline"
@@ -83,10 +92,10 @@ export default function LoginPage() {
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t" />
+              <div className="w-full border-t border-velocity-border" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500">or continue with email</span>
+              <span className="bg-velocity-graphite px-2 text-velocity-muted">or continue with email</span>
             </div>
           </div>
 
@@ -126,13 +135,13 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
+          <p className="text-center text-sm text-velocity-muted mt-6">
             Don&apos;t have an account?{" "}
-            <Link href="/auth/signup" className="text-velocity-600 hover:underline font-medium">
+            <Link href="/auth/signup" className="text-velocity-volt hover:underline font-medium">
               Sign up free
             </Link>
           </p>
-        </div>
+        </VelocityCard>
       </div>
     </div>
   );

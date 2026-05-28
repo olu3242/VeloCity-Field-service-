@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BrandWordmark, VelocityBadge, VelocityCard, VelocityGlow, VelocityLoader } from "@/components/branding";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -27,7 +28,7 @@ export default function SignupPage() {
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
       },
     });
 
@@ -46,7 +47,9 @@ export default function SignupPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/api/auth/callback`,
+      },
     });
     if (error) {
       setError(error.message);
@@ -55,15 +58,19 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="velocity-shell relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+      <VelocityGlow className="-left-24 top-10 size-80" />
+      <VelocityGlow className="-right-24 bottom-0 size-96 bg-velocity-ice/10" />
+      {loading && <VelocityLoader className="absolute inset-0 z-20 min-h-screen bg-velocity-black/92 backdrop-blur-sm" label="PROVISIONING IDENTITY" />}
+      <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold text-velocity-700">⚡ VeloCity</Link>
-          <h1 className="mt-4 text-2xl font-semibold text-gray-900">Create your account</h1>
-          <p className="text-gray-500 mt-1">Book your first service in minutes</p>
+          <BrandWordmark className="justify-center" />
+          <VelocityBadge className="mx-auto mt-6">NEW OPERATOR</VelocityBadge>
+          <h1 className="mt-4 text-4xl text-velocity-white">Create your account</h1>
+          <p className="text-velocity-muted mt-1">Book your first service in minutes</p>
         </div>
 
-        <div className="bg-white rounded-xl border p-8 shadow-sm">
+        <VelocityCard className="p-8">
           <Button
             onClick={handleGoogleSignup}
             variant="outline"
@@ -82,10 +89,10 @@ export default function SignupPage() {
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t" />
+              <div className="w-full border-t border-velocity-border" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500">or with email</span>
+              <span className="bg-velocity-graphite px-2 text-velocity-muted">or with email</span>
             </div>
           </div>
 
@@ -137,19 +144,19 @@ export default function SignupPage() {
             </Button>
           </form>
 
-          <p className="text-xs text-center text-gray-400 mt-4">
+          <p className="text-xs text-center text-velocity-muted mt-4">
             By signing up, you agree to our{" "}
             <Link href="/terms" className="underline">Terms</Link> and{" "}
             <Link href="/privacy" className="underline">Privacy Policy</Link>.
           </p>
 
-          <p className="text-center text-sm text-gray-500 mt-4">
+          <p className="text-center text-sm text-velocity-muted mt-4">
             Already have an account?{" "}
-            <Link href="/auth/login" className="text-velocity-600 hover:underline font-medium">
+            <Link href="/auth/login" className="text-velocity-volt hover:underline font-medium">
               Sign in
             </Link>
           </p>
-        </div>
+        </VelocityCard>
       </div>
     </div>
   );

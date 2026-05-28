@@ -1,25 +1,30 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import WebSocket from "ws";
-import { getEnv, requireEnv } from "@/lib/env";
+import { env, requireEnv } from "@/config/env";
+import { getSupabaseConfig, requireSupabaseConfig, warnMissingSupabaseConfig } from "@/lib/supabase/config";
 import { createMissingSupabaseClient } from "@/lib/supabase/missing-config-client";
 
 export async function createClient() {
   const cookieStore = await cookies();
-  const supabaseUrl = getEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const supabaseAnonKey = getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  const config = env.isProduction
+    ? requireSupabaseConfig()
+    : getSupabaseConfig();
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("Missing required Supabase environment variables.");
-    }
+  if (!config) {
+    warnMissingSupabaseConfig();
     return createMissingSupabaseClient() as unknown as ReturnType<typeof createServerClient>;
   }
 
   return createServerClient(
-    supabaseUrl,
-    supabaseAnonKey,
+    config.url,
+    config.anonKey,
     {
+      auth: {
+        flowType: "pkce",
+        persistSession: true,
+        autoRefreshToken: true,
+      },
       realtime: { transport: WebSocket as unknown as typeof globalThis.WebSocket },
       cookies: {
         getAll() {
@@ -39,9 +44,10 @@ export async function createClient() {
 
 export async function createAdminClient() {
   const cookieStore = await cookies();
+  const config = requireSupabaseConfig();
 
   return createServerClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    config.url,
     requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
     {
       realtime: { transport: WebSocket as unknown as typeof globalThis.WebSocket },
