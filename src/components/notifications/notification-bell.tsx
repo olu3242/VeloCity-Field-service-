@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
+import { apiFetch, apiPatch } from "@/lib/api/client";
+import { createClient } from "@/lib/supabase/client";
+import { useNotificationsRealtime } from "@/hooks/use-notifications-realtime";
 
 interface Notification {
   id: string;
@@ -24,22 +27,30 @@ const TYPE_ICONS: Record<string, string> = {
 
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [userId, setUserId] = useState<string>();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   async function load() {
-    const res = await fetch("/api/notifications?limit=10");
-    if (res.ok) {
-      const { data } = await res.json();
-      setNotifications(data ?? []);
-    }
+    setNotifications(await apiFetch<Notification[]>("/api/notifications?limit=10"));
   }
 
   useEffect(() => {
+    const supabase = createClient();
+    void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id));
     load();
     const id = setInterval(load, 30_000);
     return () => clearInterval(id);
   }, []);
+
+  const handleRealtimeInsert = useCallback((notification: Notification) => {
+    setNotifications((current) => {
+      if (current.some((item) => item.id === notification.id)) return current;
+      return [notification, ...current].slice(0, 20);
+    });
+  }, []);
+
+  useNotificationsRealtime(userId, handleRealtimeInsert);
 
   // Close on outside click
   useEffect(() => {
@@ -53,11 +64,7 @@ export function NotificationBell() {
   const unread = notifications.filter(n => !n.read).length;
 
   async function markAllRead() {
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mark_all_read: true }),
-    });
+    await apiPatch("/api/notifications", { mark_all_read: true });
     setNotifications(n => n.map(x => ({ ...x, read: true })));
   }
 

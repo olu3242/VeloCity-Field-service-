@@ -164,7 +164,7 @@ export function TipProvider({ jobId, providerName }: TipProviderProps) {
                 {providerName ? ` to ${providerName}` : ""}
               </p>
               {existingTip.note && (
-                <p className="text-sm text-green-700 mt-1 italic">"{existingTip.note}"</p>
+                <p className="text-sm text-green-700 mt-1 italic">&ldquo;{existingTip.note}&rdquo;</p>
               )}
               <p className="text-xs text-green-600 mt-1">
                 {new Date(existingTip.created_at).toLocaleDateString()}
