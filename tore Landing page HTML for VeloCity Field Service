@@ -1,0 +1,50 @@
+warning: in the working copy of 'Landing page HTML for VeloCity Field Service', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/Landing page HTML for VeloCity Field Service b/Landing page HTML for VeloCity Field Service[m
+[1mindex d0bae5c..c33928c 100644[m
+[1m--- a/Landing page HTML for VeloCity Field Service[m	
+[1m+++ b/Landing page HTML for VeloCity Field Service[m	
+[36m@@ -887,7 +887,7 @@[m
+ </section>[m
+ [m
+ <!-- WHY VELOCITY -->[m
+[31m-<section class="section why">[m
+[32m+[m[32m<section id="providers" class="section why">[m
+   <div class="section-header">[m
+     <div class="section-tag">// WHY CHOOSE US</div>[m
+     <h2 class="section-title">Why Choose<br><span style="color:var(--volt)">VeloCity?</span></h2>[m
+[36m@@ -965,7 +965,7 @@[m
+ </section>[m
+ [m
+ <!-- HOW IT WORKS -->[m
+[31m-<section class="section how">[m
+[32m+[m[32m<section id="business-solutions" class="section how">[m
+   <div class="section-header">[m
+     <div class="section-tag">// HOW IT WORKS</div>[m
+     <h2 class="section-title">From Request to<br><span style="color:var(--volt)">Completion</span></h2>[m
+[36m@@ -1000,7 +1000,7 @@[m
+ </section>[m
+ [m
+ <!-- TRUST BAR -->[m
+[31m-<div class="trust section" style="padding: 48px 80px;">[m
+[32m+[m[32m<div id="areas" class="trust section" style="padding: 48px 80px;">[m
+   <div class="trust-inner">[m
+     <div class="trust-item"><div class="trust-icon">🔒</div><div class="trust-text"><strong>Secure Escrow</strong><span>Funds held until job complete</span></div></div>[m
+     <div class="trust-item"><div class="trust-icon">📋</div><div class="trust-text"><strong>Licensed & Insured</strong><span>All providers verified</span></div></div>[m
+[36m@@ -1011,7 +1011,7 @@[m
+ </div>[m
+ [m
+ <!-- CTA -->[m
+[31m-<section class="cta-section">[m
+[32m+[m[32m<section id="pricing" class="cta-section">[m
+   <div class="cta-glow"></div>[m
+   <div class="section-tag" style="margin-bottom: 24px;">// GET STARTED TODAY</div>[m
+   <h2 class="section-title">Ready for <span style="color:var(--volt)">Velocity?</span></h2>[m
+[36m@@ -1023,7 +1023,7 @@[m
+ </section>[m
+ [m
+ <!-- FOOTER -->[m
+[31m-<footer>[m
+[32m+[m[32m<footer id="support">[m
+   <div class="footer-top">[m
+     <div class="footer-brand">[m
+       <a href="#" class="nav-logo" style="margin-bottom: 0;">[m

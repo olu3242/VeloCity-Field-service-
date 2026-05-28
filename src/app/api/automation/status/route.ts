@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { getPlatformHealth } from "@/lib/contracts/health";
+import { getSystemHealth } from "@/runtime/health/system-health";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -24,7 +25,10 @@ export async function GET(request: NextRequest) {
       { data: recentRuns },
       { data: recentEvents },
       { count: pendingPayouts },
+      { count: deadLetters },
+      { data: workers },
       health,
+      systemHealth,
     ] = await Promise.all([
       db.from("automation_queue").select("*", { count: "exact", head: true }).eq("status", "pending"),
       db.from("automation_queue").select("*", { count: "exact", head: true }).eq("status", "failed"),
@@ -32,7 +36,10 @@ export async function GET(request: NextRequest) {
       db.from("automation_runs").select("id, event_type, handler, status, duration_ms, error_message, created_at").order("created_at", { ascending: false }).limit(20),
       db.from("automation_events").select("id, event_type, status, created_at").order("created_at", { ascending: false }).limit(20),
       db.from("payout_queue").select("*", { count: "exact", head: true }).eq("status", "queued"),
+      db.from("automation_dead_letters").select("*", { count: "exact", head: true }).eq("status", "open"),
+      db.from("worker_heartbeats").select("worker_id,status,last_seen_at,processed_count,failed_count").order("last_seen_at", { ascending: false }).limit(5),
       getPlatformHealth(),
+      getSystemHealth(),
     ]);
 
     return NextResponse.json({
@@ -41,7 +48,10 @@ export async function GET(request: NextRequest) {
         recent_runs: recentRuns ?? [],
         recent_events: recentEvents ?? [],
         payouts_pending: pendingPayouts ?? 0,
+        dead_letters_open: deadLetters ?? 0,
+        workers: workers ?? [],
         health,
+        system_health: systemHealth,
       },
     });
   } catch (err) {

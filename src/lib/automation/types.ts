@@ -87,5 +87,6 @@ export interface AutomationQueueRow {
   event_type: AutomationEventType;
   payload: Record<string, unknown>;
   retry_count: number;
+  correlation_id?: string | null;
   tenant_id?: string | null;
 }

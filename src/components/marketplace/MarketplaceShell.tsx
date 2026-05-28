@@ -7,7 +7,7 @@ import { marketplaceNavGroups } from "@/config/marketplace";
 export function MarketplaceShell({
   children,
 }: {
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   return (
     <main className="min-h-screen overflow-x-hidden bg-velocity-black text-velocity-white">

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { createCorrelationId } from "@/runtime/telemetry/correlation";
 import type { AutomationEventInput, AutomationEventType } from "./types";
 
 type EmitResult = { eventId?: string; queued: boolean; error?: string; duplicate?: boolean };
@@ -35,6 +36,7 @@ export async function emitEvent(
 
   const payload = input.payload ?? {};
   const tenantId = input.tenantId ?? (typeof payload.tenant_id === "string" ? payload.tenant_id : DEFAULT_TENANT_ID);
+  const correlationId = typeof payload.correlation_id === "string" ? payload.correlation_id : createCorrelationId("evt");
 
   if (input.dedupKey) {
     const { data: existing } = await supabase
@@ -56,6 +58,7 @@ export async function emitEvent(
       actor_id: input.actorId ?? null,
       payload,
       dedup_key: input.dedupKey ?? null,
+      correlation_id: correlationId,
     })
     .select("id")
     .single();
@@ -68,14 +71,37 @@ export async function emitEvent(
     tenant_id: tenantId,
     event_id: event.id,
     event_type: input.type,
-    payload: { ...payload, tenant_id: tenantId },
+    payload: { ...payload, tenant_id: tenantId, correlation_id: correlationId },
     dedup_key: input.dedupKey ?? null,
     status: "pending",
+    correlation_id: correlationId,
   });
 
   if (queueError) {
     return { eventId: event.id, queued: false, error: queueError.message };
   }
+
+  import("@/runtime/webhooks/delivery")
+    .then(({ enqueueWebhookDeliveries }) =>
+      enqueueWebhookDeliveries({
+        tenantId,
+        eventType: input.type,
+        payload: { ...payload, tenant_id: tenantId, correlation_id: correlationId, event_id: event.id },
+        correlationId,
+      })
+    )
+    .catch(() => null);
+
+  import("@/runtime/intelligence/event-intelligence")
+    .then(({ recordEventIntelligence }) =>
+      recordEventIntelligence({
+        tenantId,
+        eventType: input.type,
+        payload: payload as Record<string, unknown>,
+        correlationId,
+      })
+    )
+    .catch(() => null);
 
   return { eventId: event.id, queued: true, duplicate: false };
 }
