@@ -1,10 +1,6 @@
 import { isRuntimePaused } from "@/lib/governance/operator"
 import { logger } from "@/runtime-core/observability"
-import { getActivePlans, getDeploymentSummary } from "./deployment-plan"
-
-// We look up threshold via a scan since PLANS map is internal
-// checkAutoRollbackThreshold uses getActivePlans + all plans to find the plan
-// Instead we expose a helper via a thin re-export trick below
+import { getPlan } from "./deployment-plan"
 
 export interface RollbackRecord {
   rollbackId: string
@@ -80,7 +76,7 @@ export function failRollback(rollbackId: string): void {
 }
 
 export function checkAutoRollbackThreshold(planId: string, errorRate: number): boolean {
-  const plan = PLANS.get(planId)
+  const plan = getPlan(planId)
   if (!plan) return false
   return errorRate >= plan.rollbackTriggerThreshold
 }
