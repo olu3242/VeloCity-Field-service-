@@ -49,55 +49,27 @@ export async function routeAutomationEvent(
 ): Promise<AutomationRouteResult> {
   const tenantId = typeof payload.tenant_id === "string" ? payload.tenant_id : DEFAULT_TENANT_ID;
   const jobId = typeof payload.job_id === "string" ? payload.job_id : undefined;
+  const typedPayload = payload as AutomationPayload;
+  const queueItem = syntheticQueueItem(eventType, typedPayload);
   const actions: string[] = [];
   const output: Record<string, unknown> = {};
 
-  switch (eventType) {
-    case "service_request_created":
-    case "serviceability_passed":
-    case "serviceability_failed": {
-      actions.push("ALICE.intake_review");
-      const description = String(payload.description ?? payload.title ?? "Service request");
-      output.alice = await runAgent(alice, `Automation intake review for ZIP ${String(payload.zip ?? "")}: ${description}`, { jobId, userId: payload.customer_id as string | undefined, tenantId });
-      break;
-    }
-    case "provider_offer_sent":
-    case "provider_offer_expired":
-    case "job_reassigned":
-    case "provider_penalty_applied":
-    case "no_provider_accepted": {
-      actions.push("MAX.dispatch_review");
-      output.max = await runAgent(max, `Automation dispatch review: ${eventType}. Payload: ${JSON.stringify(payload)}`, { jobId, tenantId });
-      break;
-    }
-    case "job_accepted":
-    case "job_state_changed":
-    case "job_started":
-    case "provider_arrived":
-    case "job_completed":
-    case "customer_confirmed":
-    case "sla_breach_detected":
-    case "sla_warning":
-    case "stuck_job_detected":
-    case "sla_warn":
-    case "sla_breach":
-    case "sla_escalate":
-    case "job_stuck":
-    case "provider_late": {
-      actions.push("NOVA.workflow_monitor");
-      output.nova = await runAgent(nova, `Automation workflow review: from ${String(payload.from_status ?? "unknown")} to ${String(payload.to_status ?? eventType)} by ${String(payload.actor_role ?? "admin")}. Payload: ${JSON.stringify(payload)}`, { jobId, tenantId });
-      if (eventType === "job_completed" || eventType === "customer_confirmed") {
-        actions.push("REX.quality_review", "LENA.retention_review");
-        output.rex = await runAgent(rex, `Automation quality review for completed job. Payload: ${JSON.stringify(payload)}`, { jobId, tenantId });
-        output.lena = await runAgent(lena, `Automation retention review after completion. Payload: ${JSON.stringify(payload)}`, { jobId, userId: payload.customer_id as string | undefined, tenantId });
+  try {
+    switch (eventType) {
+      case "service_request_created":
+      case "serviceability_passed":
+      case "serviceability_failed": {
+        actions.push("alice-intake");
+        const result = await handleAliceIntake(typedPayload, queueItem);
+        output.alice = result;
+        break;
       }
-
       // ── MAX: Dispatch ───────────────────────────────────────────────────
       case "provider_offer_sent":
       case "provider_offer_expired":
       case "job_reassigned":
+      case "provider_penalty_applied":
       case "no_provider_accepted": {
-        // Provider offer flow first, then MAX dispatch
         actions.push("provider-offer", "max-dispatch");
         const offerResult = await handleProviderOffer(typedPayload, queueItem);
         output.offer = offerResult;
@@ -204,6 +176,7 @@ export async function routeAutomationEvent(
 
       // ── SLA: Monitoring ─────────────────────────────────────────────────
       case "sla_breach_detected":
+      case "sla_warning":
       case "stuck_job_detected":
       case "sla_warn":
       case "sla_breach":

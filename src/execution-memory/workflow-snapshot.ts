@@ -30,7 +30,9 @@ export function createSnapshot(
   tenantId?: string
 ): WorkflowSnapshot {
   if (isRuntimePaused()) {
-    logger.warn("createSnapshot blocked — runtime paused", "workflow-snapshot", { workflowId })
+    logger.warn("createSnapshot blocked — runtime paused", "workflow-snapshot", {
+      metadata: { workflowId },
+    })
     throw new Error("Runtime is paused")
   }
   const existing = SNAPSHOTS.get(workflowId) ?? []

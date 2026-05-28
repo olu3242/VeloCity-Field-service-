@@ -31,7 +31,9 @@ export function recordRemediation(
   }
 ): RemediationMemory {
   if (isRuntimePaused()) {
-    logger.warn("recordRemediation blocked — runtime paused", "remediation-memory", { failurePattern })
+    logger.warn("recordRemediation blocked — runtime paused", "remediation-memory", {
+      metadata: { failurePattern },
+    })
     throw new Error("Runtime is paused")
   }
   if (REMEDIATION_MEMORY.length >= CAP) REMEDIATION_MEMORY.shift()

@@ -35,7 +35,9 @@ export function recordDecision(
   }
 ): AIDecisionRecord {
   if (isRuntimePaused()) {
-    logger.warn("recordDecision blocked — runtime paused", "ai-decision-lineage", { agentName })
+    logger.warn("recordDecision blocked — runtime paused", "ai-decision-lineage", {
+      metadata: { agentName },
+    })
     throw new Error("Runtime is paused")
   }
   if (DECISIONS.length >= CAP) DECISIONS.shift()

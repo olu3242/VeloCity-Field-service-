@@ -27,7 +27,9 @@ export function recordOptimization(
   tenantId?: string
 ): OptimizationRecord {
   if (isRuntimePaused()) {
-    logger.warn("recordOptimization blocked — runtime paused", "optimization-memory", { workflowType })
+    logger.warn("recordOptimization blocked — runtime paused", "optimization-memory", {
+      metadata: { workflowType },
+    })
     throw new Error("Runtime is paused")
   }
   if (OPTIMIZATION_HISTORY.length >= CAP) OPTIMIZATION_HISTORY.shift()

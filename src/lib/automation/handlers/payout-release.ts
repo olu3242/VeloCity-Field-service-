@@ -1,6 +1,7 @@
 // Handler: payout_queued / payout_released / payout_failed → Stripe payout + retry
 
 import { getAdminClient } from "@/lib/supabase/admin";
+import { env } from "@/config/env";
 import { transferToProvider } from "@/lib/stripe/client";
 import { emitEvent } from "../emitEvent";
 import type {
@@ -48,11 +49,7 @@ export async function handlePayoutRelease(
     await db.from("payout_queue").update({ attempts, status: "processing" }).eq("id", payout.id);
 
     try {
-      // Check if Stripe is configured
-      const stripeKey = process.env.STRIPE_SECRET_KEY;
-      const isStripeConfigured = stripeKey && !stripeKey.includes("placeholder");
-
-      if (isStripeConfigured && payout.providers?.stripe_account_id) {
+      if (env.stripe.secretKey && payout.providers?.stripe_account_id) {
         const transfer = await transferToProvider(
           payout.net_payout_cents,
           payout.providers.stripe_account_id,

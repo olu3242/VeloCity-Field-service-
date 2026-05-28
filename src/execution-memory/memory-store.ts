@@ -48,7 +48,9 @@ export function storeMemory(
   }
 ): ExecutionMemory {
   if (isRuntimePaused()) {
-    logger.warn("storeMemory blocked — runtime paused", "execution-memory", { correlationId })
+    logger.warn("storeMemory blocked — runtime paused", "execution-memory", {
+      metadata: { correlationId },
+    })
     throw new Error("Runtime is paused")
   }
   while (MEMORY_STORE.size >= CAP) evictOldest()
