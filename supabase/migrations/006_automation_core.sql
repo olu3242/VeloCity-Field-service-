@@ -1,7 +1,7 @@
 -- VeloCity Field Service - Automation core
 
 create table if not exists automation_events (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   event_type text not null,
   source text not null default 'app',
@@ -14,7 +14,7 @@ create table if not exists automation_events (
 );
 
 create table if not exists automation_queue (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   event_id uuid references automation_events(id) on delete cascade,
   event_type text not null,
@@ -30,7 +30,7 @@ create table if not exists automation_queue (
 );
 
 create table if not exists automation_runs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   queue_id uuid references automation_queue(id) on delete set null,
   event_id uuid references automation_events(id) on delete set null,
@@ -44,7 +44,7 @@ create table if not exists automation_runs (
 );
 
 create table if not exists automation_rules (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   event_type text not null,
   name text not null,
@@ -54,6 +54,23 @@ create table if not exists automation_rules (
   updated_at timestamptz not null default now()
 );
 
+alter table automation_events add column if not exists tenant_id uuid references tenants(id) default app.default_tenant_id();
+alter table automation_events add column if not exists source text not null default 'app';
+alter table automation_events add column if not exists entity_type text;
+alter table automation_events add column if not exists entity_id uuid;
+alter table automation_events add column if not exists actor_id uuid references profiles(id);
+update automation_events set tenant_id = app.default_tenant_id() where tenant_id is null;
+alter table automation_events alter column tenant_id set not null;
+
+alter table automation_queue add column if not exists tenant_id uuid references tenants(id) default app.default_tenant_id();
+alter table automation_queue add column if not exists available_at timestamptz not null default now();
+alter table automation_queue add column if not exists updated_at timestamptz not null default now();
+update automation_queue set tenant_id = app.default_tenant_id() where tenant_id is null;
+update automation_queue set available_at = coalesce(next_retry_at, created_at, now()) where available_at is null;
+alter table automation_queue alter column tenant_id set not null;
+
+alter table automation_runs add column if not exists tenant_id uuid references tenants(id) default app.default_tenant_id();
+alter table automation_runs add column if not exists event_id uuid references automation_events(id) on delete set null;
 alter table automation_runs add column if not exists queue_id uuid references automation_queue(id) on delete set null;
 alter table automation_runs add column if not exists actions jsonb not null default '[]';
 alter table automation_runs add column if not exists output jsonb not null default '{}';
@@ -61,6 +78,8 @@ alter table automation_runs add column if not exists error_message text;
 alter table automation_runs add column if not exists started_at timestamptz not null default now();
 alter table automation_runs add column if not exists completed_at timestamptz;
 alter table automation_runs add column if not exists event_type text;
+update automation_runs set tenant_id = app.default_tenant_id() where tenant_id is null;
+alter table automation_runs alter column tenant_id set not null;
 do $$
 begin
   if exists (
@@ -81,7 +100,9 @@ alter table automation_runs alter column event_type set default 'unknown';
 update automation_runs set event_type = 'unknown' where event_type is null;
 alter table automation_runs alter column event_type set not null;
 
+alter table automation_rules add column if not exists tenant_id uuid references tenants(id) default app.default_tenant_id();
 alter table automation_rules add column if not exists event_type text;
+alter table automation_rules add column if not exists name text;
 alter table automation_rules add column if not exists enabled boolean not null default true;
 alter table automation_rules add column if not exists config jsonb not null default '{}';
 do $$
@@ -92,7 +113,18 @@ begin
   ) then
     update automation_rules set event_type = trigger_event where event_type is null and trigger_event is not null;
   end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'automation_rules' and column_name = 'rule_name'
+  ) then
+    update automation_rules set name = rule_name where name is null and rule_name is not null;
+  end if;
 end $$;
+update automation_rules set tenant_id = app.default_tenant_id() where tenant_id is null;
+update automation_rules set name = coalesce(name, event_type, 'automation_rule') where name is null;
+alter table automation_rules alter column tenant_id set not null;
+alter table automation_rules alter column name set not null;
 
 create unique index if not exists automation_events_dedup_idx
   on automation_events(dedup_key) where dedup_key is not null;

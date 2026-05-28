@@ -1,7 +1,7 @@
 -- VeloCity Field Service - AI orchestration and intelligence fabric.
 
 create table if not exists orchestration_runs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   workflow_type text not null,
   status text not null default 'pending' check (status in ('pending', 'running', 'completed', 'failed', 'partial')),
@@ -16,7 +16,7 @@ create table if not exists orchestration_runs (
 );
 
 create table if not exists orchestration_tasks (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   run_id uuid references orchestration_runs(id) on delete cascade,
   agent_name text not null,
@@ -36,7 +36,7 @@ create table if not exists orchestration_tasks (
 );
 
 create table if not exists orchestration_memory (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   scope text not null check (scope in ('tenant', 'provider', 'workflow', 'dispatch', 'crm', 'predictive')),
   subject_id uuid,
@@ -51,7 +51,7 @@ create table if not exists orchestration_memory (
 );
 
 create table if not exists autonomous_recommendations (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   source text not null,
   category text not null,
@@ -67,7 +67,7 @@ create table if not exists autonomous_recommendations (
 );
 
 create table if not exists event_intelligence_scores (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   event_type text not null,
   score numeric not null default 0,

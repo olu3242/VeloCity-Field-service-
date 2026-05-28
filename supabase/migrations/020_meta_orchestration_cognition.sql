@@ -1,7 +1,7 @@
 -- VeloCity Field Service - Meta-orchestration and cognition runtime.
 
 create table if not exists meta_orchestration_plans (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   objective text not null,
   status text not null default 'planned' check (status in ('planned', 'running', 'completed', 'failed', 'paused')),
@@ -16,7 +16,7 @@ create table if not exists meta_orchestration_plans (
 );
 
 create table if not exists orchestration_checkpoints (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   plan_id uuid references meta_orchestration_plans(id) on delete cascade,
   run_id uuid references orchestration_runs(id) on delete cascade,
@@ -28,7 +28,7 @@ create table if not exists orchestration_checkpoints (
 );
 
 create table if not exists memory_graph_edges (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   from_memory_id uuid references orchestration_memory(id) on delete cascade,
   to_memory_id uuid references orchestration_memory(id) on delete cascade,
@@ -40,7 +40,7 @@ create table if not exists memory_graph_edges (
 );
 
 create table if not exists cognition_scores (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   subject_type text not null,
   subject_id uuid,
@@ -54,7 +54,7 @@ create table if not exists cognition_scores (
 );
 
 create table if not exists ecosystem_participants (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   name text not null,
   participant_type text not null,

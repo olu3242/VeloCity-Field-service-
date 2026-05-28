@@ -1,3 +1,5 @@
+create extension if not exists pgcrypto;
+
 -- VeloCity Field Service - Initial Schema
 -- Migration 001: Core tables
 
@@ -90,7 +92,7 @@ create table profiles (
 -- ============================================================
 
 create table service_areas (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   city text not null,
   state text not null,
@@ -104,7 +106,7 @@ create table service_areas (
 -- ============================================================
 
 create table providers (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references profiles(id) on delete cascade,
   business_name text not null,
   business_license text,
@@ -137,7 +139,7 @@ create table providers (
 -- ============================================================
 
 create table customer_addresses (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references profiles(id) on delete cascade,
   label text not null default 'Home',
   street text not null,
@@ -156,7 +158,7 @@ create table customer_addresses (
 -- ============================================================
 
 create table jobs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references profiles(id),
   provider_id uuid references providers(id),
   category service_category not null,
@@ -215,7 +217,7 @@ create table jobs (
 -- ============================================================
 
 create table job_status_history (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   job_id uuid not null references jobs(id) on delete cascade,
   from_status job_status,
   to_status job_status not null,
@@ -231,7 +233,7 @@ create table job_status_history (
 -- ============================================================
 
 create table quotes (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   job_id uuid not null references jobs(id) on delete cascade,
   provider_id uuid not null references providers(id),
   is_change_order boolean not null default false,
@@ -253,7 +255,7 @@ create table quotes (
 -- ============================================================
 
 create table payments (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   job_id uuid not null references jobs(id),
   customer_id uuid not null references profiles(id),
   provider_id uuid references providers(id),
@@ -277,7 +279,7 @@ create table payments (
 -- ============================================================
 
 create table reviews (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   job_id uuid not null unique references jobs(id),
   reviewer_id uuid not null references profiles(id),
   reviewee_id uuid not null references profiles(id),
@@ -293,7 +295,7 @@ create table reviews (
 -- ============================================================
 
 create table disputes (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   job_id uuid not null references jobs(id),
   initiated_by uuid not null references profiles(id),
   against uuid not null references profiles(id),
@@ -315,7 +317,7 @@ create table disputes (
 -- ============================================================
 
 create table provider_offers (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   job_id uuid not null references jobs(id) on delete cascade,
   provider_id uuid not null references providers(id),
   match_score numeric(4,3),
@@ -333,7 +335,7 @@ create table provider_offers (
 -- ============================================================
 
 create table subscriptions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references profiles(id),
   provider_id uuid references providers(id),
   stripe_subscription_id text unique,
@@ -353,7 +355,7 @@ create table subscriptions (
 -- ============================================================
 
 create table notifications (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   user_id uuid not null references profiles(id) on delete cascade,
   channel notification_channel not null,
   title text not null,
@@ -370,7 +372,7 @@ create table notifications (
 -- ============================================================
 
 create table agent_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   agent_name text not null,
   job_id uuid references jobs(id),
   user_id uuid references profiles(id),

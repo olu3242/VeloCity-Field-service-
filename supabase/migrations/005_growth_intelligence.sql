@@ -1,7 +1,7 @@
 -- VeloCity Field Service - Growth intelligence and franchise readiness
 
 create table if not exists franchise_territories (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) default app.default_tenant_id(),
   name text not null,
   city text not null,
@@ -13,7 +13,7 @@ create table if not exists franchise_territories (
 );
 
 create table if not exists territory_operators (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) default app.default_tenant_id(),
   territory_id uuid not null references franchise_territories(id) on delete cascade,
   profile_id uuid references profiles(id),
@@ -26,7 +26,7 @@ create table if not exists territory_operators (
 );
 
 create table if not exists territory_scorecards (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) default app.default_tenant_id(),
   territory_id uuid not null references franchise_territories(id) on delete cascade,
   demand_index integer not null default 0,
@@ -45,7 +45,7 @@ create table if not exists territory_scorecards (
 );
 
 create table if not exists expansion_recommendations (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) default app.default_tenant_id(),
   territory_id uuid references franchise_territories(id) on delete cascade,
   recommendation_type text not null,
@@ -61,7 +61,7 @@ create table if not exists expansion_recommendations (
 );
 
 create table if not exists local_market_snapshots (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id) default app.default_tenant_id(),
   territory_id uuid references franchise_territories(id) on delete cascade,
   city text not null,

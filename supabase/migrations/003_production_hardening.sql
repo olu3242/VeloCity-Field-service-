@@ -2,7 +2,7 @@
 -- Adds missing audit primitives and RLS policies needed by the MVP routes.
 
 create table if not exists audit_logs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   actor_id uuid references profiles(id),
   actor_role user_role,
   action text not null,

@@ -3,7 +3,7 @@
 alter table webhook_subscriptions add column if not exists signing_secret text;
 
 create table if not exists webhook_deliveries (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   subscription_id uuid references webhook_subscriptions(id) on delete cascade,
   event_type text not null,
@@ -21,7 +21,7 @@ create table if not exists webhook_deliveries (
 );
 
 create table if not exists api_rate_windows (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   api_key_id uuid references platform_api_keys(id) on delete cascade,
   route text not null,
@@ -33,7 +33,7 @@ create table if not exists api_rate_windows (
 );
 
 create table if not exists tenant_branding (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) not null unique default app.default_tenant_id(),
   display_name text not null default 'VeloCity',
   primary_color text not null default '#c8f135',
@@ -47,7 +47,7 @@ create table if not exists tenant_branding (
 );
 
 create table if not exists intelligence_snapshots (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   scope text not null,
   subject_id uuid,

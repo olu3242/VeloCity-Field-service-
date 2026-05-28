@@ -2,7 +2,7 @@
 -- Persistent intelligence, AI governance, metering, plugin, webhook, and incident state.
 
 create table if not exists operational_alerts (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   severity text not null check (severity in ('info', 'warning', 'critical')),
   system text not null,
@@ -16,7 +16,7 @@ create table if not exists operational_alerts (
 );
 
 create table if not exists ai_execution_audits (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   actor_id uuid references profiles(id),
   agent text not null,
@@ -36,7 +36,7 @@ create table if not exists ai_execution_audits (
 );
 
 create table if not exists usage_meter_events (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   subject_id uuid,
   metric text not null,
@@ -50,7 +50,7 @@ create table if not exists usage_meter_events (
 );
 
 create table if not exists platform_api_keys (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   name text not null,
   key_hash text not null unique,
@@ -61,7 +61,7 @@ create table if not exists platform_api_keys (
 );
 
 create table if not exists webhook_subscriptions (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   url text not null,
   events text[] not null default '{}',
@@ -73,7 +73,7 @@ create table if not exists webhook_subscriptions (
 );
 
 create table if not exists plugin_installations (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   plugin_id text not null,
   plugin_type text not null,

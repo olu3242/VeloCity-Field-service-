@@ -1,7 +1,7 @@
 -- VeloCity Field Service - Distributed cognition runtime.
 
 create table if not exists execution_graphs (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   plan_id uuid references meta_orchestration_plans(id) on delete set null,
   status text not null default 'planned' check (status in ('planned', 'running', 'completed', 'failed', 'replaying')),
@@ -13,7 +13,7 @@ create table if not exists execution_graphs (
 );
 
 create table if not exists execution_graph_nodes (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   graph_id uuid references execution_graphs(id) on delete cascade,
   node_key text not null,
@@ -30,7 +30,7 @@ create table if not exists execution_graph_nodes (
 );
 
 create table if not exists cognition_telemetry (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   signal_type text not null,
   subject_type text not null,
@@ -43,7 +43,7 @@ create table if not exists cognition_telemetry (
 );
 
 create table if not exists optimization_loops (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   loop_type text not null,
   target_type text not null,
@@ -58,7 +58,7 @@ create table if not exists optimization_loops (
 );
 
 create table if not exists federation_events (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) default app.default_tenant_id(),
   participant_id uuid references ecosystem_participants(id) on delete set null,
   event_type text not null,

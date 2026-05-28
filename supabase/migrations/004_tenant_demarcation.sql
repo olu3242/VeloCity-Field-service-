@@ -4,7 +4,7 @@
 create schema if not exists app;
 
 create table if not exists tenants (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   name text not null,
   created_at timestamptz not null default now(),
