@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { fail, ok, serverError, unauthorized } from "@/lib/api/response";
+import { listNotifications } from "@/lib/repositories/notifications";
 import { createClient } from "@/lib/supabase/server";
 
 // GET /api/notifications?limit=N
@@ -8,33 +10,16 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorized();
 
   const url = new URL(request.url);
   const limitParam = url.searchParams.get("limit");
   const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 50;
 
-  const { data, error } = await supabase
-    .from("notifications")
-    .select("id, type, message, is_read, created_at, job_id, metadata")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const { data: notifications, error } = await listNotifications(supabase, user.id, limit);
+  if (error) return serverError(error.message);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Map is_read → read for the NotificationBell component
-  const notifications = (data ?? []).map((n) => ({
-    id: n.id,
-    type: n.type,
-    message: n.message,
-    read: n.is_read ?? false,
-    created_at: n.created_at,
-    job_id: n.job_id ?? undefined,
-    metadata: n.metadata ?? undefined,
-  }));
-
-  return NextResponse.json({ data: notifications });
+  return ok(notifications);
 }
 
 // PATCH /api/notifications
@@ -43,7 +28,7 @@ export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorized();
 
   const body = await request.json().catch(() => ({}));
   const { mark_all_read, mark_all, id, ids } = body as {
@@ -56,24 +41,29 @@ export async function PATCH(request: NextRequest) {
   const shouldMarkAll = mark_all_read === true || mark_all === true;
 
   if (shouldMarkAll) {
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq("user_id", user.id)
       .eq("is_read", false);
+    if (error) return serverError(error.message);
   } else if (id) {
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .update({ is_read: true, read_at: new Date().toISOString() })
       .eq("id", id)
       .eq("user_id", user.id);
+    if (error) return serverError(error.message);
   } else if (ids?.length) {
-    await supabase
+    const { error } = await supabase
       .from("notifications")
       .update({ is_read: true, read_at: new Date().toISOString() })
       .in("id", ids)
       .eq("user_id", user.id);
+    if (error) return serverError(error.message);
+  } else {
+    return fail("id, ids, or mark_all_read is required");
   }
 
-  return NextResponse.json({ success: true });
+  return ok({ updated: true });
 }

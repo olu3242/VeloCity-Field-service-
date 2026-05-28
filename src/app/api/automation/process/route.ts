@@ -2,11 +2,12 @@
 // Protected by CRON_SECRET header
 
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/config/env";
 import { processAutomationQueue } from "@/lib/automation/worker";
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
-  const expected = process.env.CRON_SECRET;
+  const expected = env.cronSecret;
 
   if (expected && secret !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

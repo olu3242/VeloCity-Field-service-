@@ -6,9 +6,12 @@ import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
+import { env } from "@/config/env";
 import { formatCents } from "@/lib/utils";
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+const stripePromise = env.stripe.publishableKey
+  ? loadStripe(env.stripe.publishableKey)
+  : Promise.resolve(null);
 
 function CheckoutForm({
   amountCents,
@@ -62,7 +65,7 @@ function CheckoutForm({
 export default function PayPage() {
   const params = useParams();
   const router = useRouter();
-  const jobId = params.id as string;
+  const jobId = params?.id as string;
 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [amountCents, setAmountCents] = useState(0);
@@ -114,6 +117,22 @@ export default function PayPage() {
         <div className="text-center">
           <p className="text-red-600 mb-4">{error ?? "Something went wrong"}</p>
           <Link href={`/dashboard/jobs/${jobId}`} className="text-velocity-600 hover:underline">
+            Back to job
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!env.stripe.publishableKey) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-velocity-black px-4 text-velocity-white">
+        <div className="max-w-md rounded-velocity-lg border border-velocity-border bg-velocity-carbon p-8 text-center shadow-velocity-panel">
+          <h1 className="font-display text-4xl uppercase tracking-normal">Payments unavailable</h1>
+          <p className="mt-3 text-sm leading-6 text-velocity-muted">
+            Stripe publishable key is not configured for this local environment.
+          </p>
+          <Link href={`/dashboard/jobs/${jobId}`} className="mt-6 inline-flex text-sm font-semibold text-velocity-volt hover:underline">
             Back to job
           </Link>
         </div>

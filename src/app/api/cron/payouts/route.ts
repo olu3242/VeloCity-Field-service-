@@ -2,12 +2,13 @@
 // Runs every hour
 
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/config/env";
 import { processReadyPayouts } from "@/lib/automation/sla";
 import { processAutomationQueue } from "@/lib/automation/worker";
 
 export async function GET(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret") ?? request.nextUrl.searchParams.get("secret");
-  const expected = process.env.CRON_SECRET;
+  const expected = env.cronSecret;
   if (expected && secret !== expected) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

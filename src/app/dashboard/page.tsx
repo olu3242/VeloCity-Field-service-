@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { BrandWordmark, VelocityBadge } from "@/components/branding";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -40,12 +41,12 @@ export default async function CustomerDashboard() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="velocity-shell min-h-screen">
       {/* Top nav */}
-      <nav className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="font-bold text-xl text-velocity-700">⚡ VeloCity</Link>
+      <nav className="velocity-glass flex items-center justify-between border-b border-velocity-border px-6 py-4">
+        <BrandWordmark />
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">Hi, {profile?.full_name?.split(" ")[0]}</span>
+          <span className="text-sm text-velocity-muted">Hi, {profile?.full_name?.split(" ")[0]}</span>
           <Button asChild>
             <Link href="/book">+ New Request</Link>
           </Button>
@@ -53,7 +54,8 @@ export default async function CustomerDashboard() {
       </nav>
 
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">My Dashboard</h1>
+        <VelocityBadge className="mb-4">CUSTOMER OS</VelocityBadge>
+        <h1 className="mb-6 text-4xl text-velocity-white">My Dashboard</h1>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">

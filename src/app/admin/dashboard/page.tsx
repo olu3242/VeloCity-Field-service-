@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProviderApprovalActions } from "@/components/admin/provider-actions";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { BrandWordmark } from "@/components/branding";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -55,11 +56,12 @@ export default async function AdminDashboard() {
   ]);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="velocity-shell min-h-screen text-velocity-white">
       {/* Admin Nav */}
-      <nav className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
+      <nav className="velocity-glass flex items-center justify-between border-b border-velocity-border px-6 py-4">
         <div className="flex items-center gap-4">
-          <Link href="/" className="font-bold text-xl text-velocity-300">⚡ VeloCity Admin</Link>
+          <BrandWordmark />
+          <span className="font-mono text-xs uppercase tracking-[0.16em] text-velocity-muted">Admin OS</span>
           <div className="flex items-center gap-1 text-xs">
             <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
             <span className="text-green-400">Live</span>

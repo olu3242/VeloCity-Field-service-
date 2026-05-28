@@ -2,8 +2,62 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ProviderDocumentsList, ProviderJobsList, ProviderPayoutsList, RelatedList } from "@/components/related-lists";
-import { formatCents, formatDateTime } from "@/lib/utils";
+import { ProviderApprovalActions } from "@/components/admin/provider-actions";
+import { ProviderStatusButton } from "@/components/admin/provider-status-button";
+import {
+  formatCents,
+  formatDateTime,
+  JOB_STATUS_COLORS,
+  JOB_STATUS_LABELS,
+  SERVICE_CATEGORY_ICONS,
+} from "@/lib/utils";
+import type { JobStatus } from "@/types";
+
+type ServiceCategory = keyof typeof SERVICE_CATEGORY_ICONS;
+
+type ProviderData = {
+  id: string;
+  user_id: string;
+  business_name: string;
+  status: string;
+  created_at: string;
+  bio?: string | null;
+  categories?: string[] | null;
+  service_radius_miles?: number | null;
+  hourly_rate_cents?: number | null;
+  years_experience?: number | null;
+  business_license?: string | null;
+  insurance_number?: string | null;
+  insurance_expiry?: string | null;
+  trust_score?: number | null;
+  profiles?: {
+    full_name?: string | null;
+    email?: string | null;
+    created_at?: string | null;
+  } | null;
+};
+
+type JobRow = {
+  id: string;
+  title: string;
+  status: string;
+  category: ServiceCategory;
+  final_cost_cents?: number | null;
+  created_at: string;
+};
+
+type TipRow = {
+  amount_cents?: number | null;
+  created_at: string;
+  payment_status?: string | null;
+};
+
+type ReviewRow = {
+  rating: number;
+  comment?: string | null;
+  created_at: string;
+  job_id?: string | null;
+};
 
 export default async function AdminProviderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -205,7 +259,7 @@ export default async function AdminProviderDetailPage({ params }: { params: Prom
                   <p className="text-sm text-white/40">No tips received.</p>
                 ) : tips.map((tip, i) => (
                   <div key={i} className="flex items-center justify-between text-sm border border-white/10 rounded-lg px-3 py-2">
-                    <span className="text-emerald-400 font-medium">{formatCents(tip.amount_cents)}</span>
+                    <span className="text-emerald-400 font-medium">{formatCents(tip.amount_cents ?? 0)}</span>
                     <span className="text-white/40">{formatDateTime(tip.created_at)}</span>
                   </div>
                 ))}
@@ -251,22 +305,15 @@ export default async function AdminProviderDetailPage({ params }: { params: Prom
                   <span className="text-white/50">Tips</span>
                   <span className="text-emerald-400 font-medium">{formatCents(totalTips)}</span>
                 </div>
-                <div className="text-xs text-gray-500">{formatDateTime(payout.created_at)}</div>
-              </div>
-            ))}
-            {!payouts?.length && <p className="text-sm text-gray-500">No payout records found.</p>}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="mt-6 grid gap-4 lg:grid-cols-2">
-        <ProviderJobsList tenantId={tenantId} providerId={provider.id} />
-        <ProviderDocumentsList tenantId={tenantId} providerId={provider.id} />
-        <RelatedList title="Provider Availability" table="provider_availability" tenantId={tenantId} filters={[{ column: "provider_id", value: provider.id }]} primaryColumn="day_of_week" statusColumn="is_active" secondaryColumn="start_time" />
-        <RelatedList title="Provider Reviews" table="reviews" tenantId={tenantId} filters={[{ column: "reviewee_id", value: provider.user_id }]} primaryColumn="comment" statusColumn="rating" />
-        <ProviderPayoutsList tenantId={tenantId} providerId={provider.id} />
-        <RelatedList title="Provider Disputes" table="disputes" tenantId={tenantId} filters={[{ column: "against", value: provider.user_id }]} primaryColumn="reason" statusColumn="status" href={(row) => `/admin/disputes/${row.id}`} />
-      </section>
-    </main>
+                <div className="border-t border-white/10 pt-3 flex justify-between">
+                  <span className="text-white/50">Combined</span>
+                  <span className="text-velocity-400 font-semibold">{formatCents(combinedTotal)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

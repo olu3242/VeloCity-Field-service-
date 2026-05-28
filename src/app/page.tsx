@@ -7,18 +7,45 @@ function extractFirstMatch(source: string, pattern: RegExp) {
 }
 
 function mapLandingLinks(markup: string) {
-  let nextBookHref = 0;
-  let nextProviderHref = 0;
-  return markup.replace(/href="#"/g, () => {
-    nextBookHref += 1;
-    if (nextBookHref === 1) return 'href="/"';
-    if (nextBookHref === 2) return 'href="/auth/login"';
-    if (nextBookHref === 3) return 'href="/book"';
-    if (nextBookHref === 4) return 'href="/book"';
-    nextProviderHref += 1;
-    if (nextProviderHref === 1) return 'href="/provider/apply"';
-    return 'href="/"';
-  });
+  const linkTargets: Record<string, string> = {
+    velocity: "/",
+    "sign in": "/auth/login",
+    "book service": "/book",
+    "book your first service": "/book",
+    "become a provider": "/provider/apply",
+    "home services": "/services",
+    providers: "/providers",
+    "service areas": "/service-areas",
+    community: "/community",
+    pricing: "/pricing",
+    "provider dashboard": "/provider/dashboard",
+    "business solutions": "/business-solutions",
+    "territory operators": "/territory-operators",
+    "alice intake": "/ai/alice",
+    "max dispatch": "/ai/max",
+    "quinn quotes": "/ai/quinn",
+    "rex quality": "/ai/rex",
+    "help center": "/support",
+    "contact us": "/support#contact",
+    "terms of service": "/terms",
+    "privacy policy": "/privacy",
+  };
+
+  return markup.replace(
+    /<a href="#"([^>]*)>([\s\S]*?)<\/a>/g,
+    (anchor, attributes: string, content: string) => {
+      const label = content
+        .replace(/<[^>]+>/g, "")
+        .replace(/[→⚡]/g, "")
+        .replace(/[—–-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+      const href = linkTargets[label] ?? "/";
+
+      return `<a href="${href}"${attributes}>${content}</a>`;
+    }
+  );
 }
 
 export default async function HomePage() {

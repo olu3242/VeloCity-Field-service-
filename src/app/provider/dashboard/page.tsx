@@ -21,6 +21,7 @@ import {
 } from "@/lib/scoring";
 import { recommendProviderPlan, forecastRevenue } from "@/lib/revenue";
 import { analyzeSupplyGap } from "@/lib/expansion";
+import { BrandWordmark, VelocityBadge } from "@/components/branding";
 
 export default async function ProviderDashboard() {
   const supabase = await createClient();
@@ -115,16 +116,20 @@ export default async function ProviderDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="font-bold text-xl text-velocity-700">⚡ VeloCity</Link>
+    <div className="velocity-shell min-h-screen">
+      <nav className="velocity-glass flex items-center justify-between border-b border-velocity-border px-6 py-4">
+        <div className="flex items-center gap-4">
+          <BrandWordmark />
+          <span className="font-mono text-xs uppercase tracking-[0.16em] text-velocity-muted">Provider OS</span>
+        </div>
         <div className="flex items-center gap-4">
           <OnlineToggle providerId={provider.id} isOnline={provider.is_online} />
-          <span className="text-sm text-gray-600">{profile?.full_name}</span>
+          <span className="text-sm text-velocity-muted">{profile?.full_name}</span>
         </div>
       </nav>
 
       <div className="mx-auto max-w-5xl px-4 py-8">
+        <VelocityBadge className="mb-4">FIELD OPERATIONS</VelocityBadge>
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Provider Dashboard</h1>
           <div className="flex items-center gap-2">

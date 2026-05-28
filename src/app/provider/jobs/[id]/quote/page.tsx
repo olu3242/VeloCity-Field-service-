@@ -21,7 +21,7 @@ const EMPTY_LINE: QuoteLineItem = {
 export default function SubmitQuotePage() {
   const router = useRouter();
   const params = useParams();
-  const jobId = params.id as string;
+  const jobId = params?.id as string;
 
   const [lines, setLines] = useState<QuoteLineItem[]>([{ ...EMPTY_LINE }]);
   const [notes, setNotes] = useState("");

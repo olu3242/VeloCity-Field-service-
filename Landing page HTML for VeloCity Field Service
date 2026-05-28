@@ -887,7 +887,7 @@
 </section>
 
 <!-- WHY VELOCITY -->
-<section class="section why">
+<section id="providers" class="section why">
   <div class="section-header">
     <div class="section-tag">// WHY CHOOSE US</div>
     <h2 class="section-title">Why Choose<br><span style="color:var(--volt)">VeloCity?</span></h2>
@@ -965,7 +965,7 @@
 </section>
 
 <!-- HOW IT WORKS -->
-<section class="section how">
+<section id="business-solutions" class="section how">
   <div class="section-header">
     <div class="section-tag">// HOW IT WORKS</div>
     <h2 class="section-title">From Request to<br><span style="color:var(--volt)">Completion</span></h2>
@@ -1000,7 +1000,7 @@
 </section>
 
 <!-- TRUST BAR -->
-<div class="trust section" style="padding: 48px 80px;">
+<div id="areas" class="trust section" style="padding: 48px 80px;">
   <div class="trust-inner">
     <div class="trust-item"><div class="trust-icon">🔒</div><div class="trust-text"><strong>Secure Escrow</strong><span>Funds held until job complete</span></div></div>
     <div class="trust-item"><div class="trust-icon">📋</div><div class="trust-text"><strong>Licensed & Insured</strong><span>All providers verified</span></div></div>
@@ -1011,7 +1011,7 @@
 </div>
 
 <!-- CTA -->
-<section class="cta-section">
+<section id="pricing" class="cta-section">
   <div class="cta-glow"></div>
   <div class="section-tag" style="margin-bottom: 24px;">// GET STARTED TODAY</div>
   <h2 class="section-title">Ready for <span style="color:var(--volt)">Velocity?</span></h2>
@@ -1023,7 +1023,7 @@
 </section>
 
 <!-- FOOTER -->
-<footer>
+<footer id="support">
   <div class="footer-top">
     <div class="footer-brand">
       <a href="#" class="nav-logo" style="margin-bottom: 0;">

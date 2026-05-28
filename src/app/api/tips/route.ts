@@ -2,6 +2,7 @@
 // GET  /api/tips?job_id= — Check existing tip for a job
 
 import { NextRequest, NextResponse } from "next/server";
+import { env } from "@/config/env";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { tipSchema, parseBody } from "@/lib/validation";
@@ -84,9 +85,7 @@ export async function POST(request: NextRequest) {
   }
 
   const idempotencyKey = `tip:${job_id}:${user.id}:${amount_cents}`;
-  const isStripeConfigured =
-    !!process.env.STRIPE_SECRET_KEY &&
-    !process.env.STRIPE_SECRET_KEY.includes("placeholder");
+  const isStripeConfigured = Boolean(env.stripe.secretKey);
 
   let stripePaymentIntentId: string | null = null;
   let paymentStatus: "pending" | "succeeded" | "failed" = "pending";

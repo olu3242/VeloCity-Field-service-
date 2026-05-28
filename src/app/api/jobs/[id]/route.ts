@@ -1,5 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { forbidden, notFound, ok, serverError, unauthorized } from "@/lib/api/response";
+import { getAccessibleJob, getJobWithRuntime } from "@/lib/repositories/jobs";
 import { createClient } from "@/lib/supabase/server";
+import { getTenantId } from "@/lib/tenancy";
 
 export async function GET(
   _request: NextRequest,
@@ -9,23 +12,18 @@ export async function GET(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorized();
 
-  const { data, error } = await supabase
-    .from("jobs")
-    .select(`
-      *,
-      profiles!jobs_customer_id_fkey(id, full_name, phone, avatar_url),
-      providers(id, business_name, trust_score, profiles!providers_user_id_fkey(full_name, phone, avatar_url)),
-      quotes(*),
-      payments(*)
-    `)
-    .eq("id", id)
-    .single();
+  const { data: profile } = await supabase.from("profiles").select("role, tenant_id").eq("id", user.id).single();
+  const tenantId = getTenantId(profile);
+  const { data: accessible } = await getAccessibleJob(supabase, { tenantId, jobId: id, userId: user.id, role: profile?.role });
+  if (!accessible && profile?.role !== "admin") return forbidden();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 });
+  const { data, error } = await getJobWithRuntime(supabase, id);
 
-  return NextResponse.json({ data });
+  if (error) return notFound(error.message);
+
+  return ok(data);
 }
 
 export async function PATCH(
@@ -36,7 +34,12 @@ export async function PATCH(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user) return unauthorized();
+
+  const { data: profile } = await supabase.from("profiles").select("role, tenant_id").eq("id", user.id).single();
+  const tenantId = getTenantId(profile);
+  const { data: accessible } = await getAccessibleJob(supabase, { tenantId, jobId: id, userId: user.id, role: profile?.role });
+  if (!accessible && profile?.role !== "admin") return forbidden();
 
   const body = await request.json();
 
@@ -47,7 +50,7 @@ export async function PATCH(
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return serverError(error.message);
 
-  return NextResponse.json({ data });
+  return ok(data);
 }
