@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createCorrelationId } from "@/runtime/telemetry/correlation";
 import { runOrchestration } from "@/runtime/orchestration/agent-orchestrator";

@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { getAgentsByEvent, getAgent } from "@/lib/agents/registry";
 import { runAgent } from "@/lib/agents/runAgent";
 import { routeTask } from "@/lib/coordination/task-router";

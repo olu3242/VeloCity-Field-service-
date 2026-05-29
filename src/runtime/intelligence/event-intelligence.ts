@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { scoreEventAnomaly } from "@/lib/event-intelligence/anomaly-scorer";
 import { getAdminClient } from "@/lib/supabase/admin";
 

@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
 import { emitEvent } from "@/lib/automation/emitEvent";

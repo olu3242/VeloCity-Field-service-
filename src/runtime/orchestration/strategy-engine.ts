@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { getSystemHealth } from "@/runtime/health/system-health";
 
 export type ExecutionStrategy = {

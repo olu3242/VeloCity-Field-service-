@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { getSystemHealth } from "@/runtime/health/system-health";
 import { buildOperationalPulse } from "@/lib/scoring/composite/operationalScoring";
 import { getAdminClient } from "@/lib/supabase/admin";

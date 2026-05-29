@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { getOperationsCommandCenter } from "@/runtime/intelligence/operations-command-center";
 import { getEventIntelligenceSummary } from "@/runtime/intelligence/event-intelligence";
 import { getAdminClient } from "@/lib/supabase/admin";

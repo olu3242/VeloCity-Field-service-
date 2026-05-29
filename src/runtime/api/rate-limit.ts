@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { getAdminClient } from "@/lib/supabase/admin";
 
 export async function consumeApiRateLimit(input: {

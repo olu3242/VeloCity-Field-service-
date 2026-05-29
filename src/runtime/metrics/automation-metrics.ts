@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import type { AutomationWorkerResult } from "@/lib/automation/worker";
 
 export function summarizeAutomationResult(result: AutomationWorkerResult) {

@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { evaluateConfidence } from "@/lib/ai-quality/confidence-threshold";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createCorrelationId } from "@/runtime/telemetry/correlation";

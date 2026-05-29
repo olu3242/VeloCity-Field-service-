@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { createHmac } from "node:crypto";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { createCorrelationId } from "@/runtime/telemetry/correlation";

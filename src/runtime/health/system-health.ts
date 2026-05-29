@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { env, hasEnvGroup } from "@/config/env";
 import { getAdminClient } from "@/lib/supabase/admin";
 

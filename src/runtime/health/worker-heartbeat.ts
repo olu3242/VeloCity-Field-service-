@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const DEFAULT_WORKER_ID = "local-automation-worker";

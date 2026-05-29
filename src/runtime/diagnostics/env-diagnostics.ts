@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { env, getEnvStatus } from "@/config/env";
 
 export function getEnvironmentDiagnostics() {

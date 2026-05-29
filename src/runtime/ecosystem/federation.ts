@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { getAdminClient } from "@/lib/supabase/admin";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { createCorrelationId } from "@/runtime/telemetry/correlation";

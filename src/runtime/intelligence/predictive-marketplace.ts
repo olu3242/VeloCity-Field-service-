@@ -1,3 +1,4 @@
+import "@/runtime/server-only";
 import { forecastDemand, forecastProviderSupply } from "@/lib/prediction";
 import { calculateTerritoryOpportunityScore } from "@/lib/expansion";
 import { calculateRetentionProbabilityScore } from "@/lib/scoring";
