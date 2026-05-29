@@ -51,6 +51,25 @@ export function MarketplaceShell({
         </div>
       </header>
       {children}
+      <footer className="border-t border-velocity-border bg-velocity-black px-4 pb-24 pt-8 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-velocity-muted sm:flex-row sm:items-center sm:justify-between">
+          <span>© 2026 VeloCity Field Service. Operational marketplace infrastructure.</span>
+          <nav aria-label="Legal links" className="flex flex-wrap gap-x-4 gap-y-2">
+            {[
+              { label: "Terms", href: "/terms" },
+              { label: "Privacy", href: "/privacy" },
+              { label: "Provider Agreement", href: "/provider-agreement" },
+              { label: "Contractor Agreement", href: "/contractor-agreement" },
+              { label: "Refunds", href: "/refund-policy" },
+              { label: "Cookies", href: "/cookie-policy" },
+            ].map((item) => (
+              <Link key={item.href} href={item.href} className="transition hover:text-velocity-volt">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      </footer>
       <nav
         aria-label="Mobile marketplace navigation"
         className="fixed inset-x-0 bottom-0 z-50 border-t border-velocity-border bg-velocity-black/92 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden"

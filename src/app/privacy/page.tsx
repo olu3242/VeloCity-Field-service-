@@ -5,11 +5,11 @@ export default function PrivacyPage() {
     <InfoPage
       eyebrow="// PRIVACY"
       title="Privacy Policy"
-      description="Operational placeholder for privacy policy content. Replace with reviewed legal copy before production launch."
+      description="This policy explains how VeloCity collects, uses, protects, and audits marketplace data for customers, providers, enterprise accounts, and operational administrators."
       bullets={[
-        "Customer, provider, job, message, payment, and automation data should remain protected by auth, RLS, and tenant boundaries.",
-        "Realtime channels and storage access must be scoped to authorized users and protected operational roles.",
-        "AI agent logs should avoid unnecessary sensitive data and support auditability for marketplace decisions.",
+        "We process account, contact, job, location, payment, message, review, support, device, and operational telemetry data to run the marketplace and protect service quality.",
+        "Access controls, tenant boundaries, row-level security, signed storage access, and service-role restrictions are used to limit data access to authorized workflows.",
+        "Automation and AI logs are retained for operational auditability, quality review, abuse prevention, dispute handling, and service reliability monitoring.",
       ]}
       cta={{ label: "Return Home", href: "/" }}
     />

@@ -200,6 +200,12 @@ export default function ProviderApplyPage() {
                 <li>Admin review (1-2 business days)</li>
                 <li>Connect Stripe for payouts</li>
               </ol>
+              <p className="mt-3">
+                By submitting, you agree to the{" "}
+                <Link href="/provider-agreement" className="underline">Provider Agreement</Link>
+                {" "}and{" "}
+                <Link href="/contractor-agreement" className="underline">Independent Contractor Agreement</Link>.
+              </p>
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
