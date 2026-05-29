@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 
-export function ReviewFormEnhanced({ jobId, providerName }: { jobId: string; providerName: string }) {
+export function ReviewForm({ jobId, providerName }: { jobId: string; providerName: string }) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
@@ -33,7 +33,6 @@ export function ReviewFormEnhanced({ jobId, providerName }: { jobId: string; pro
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <p className="text-gray-600">How was your experience with <strong>{providerName}</strong>?</p>
-      {/* Star rating */}
       <div className="flex gap-2">
         {[1, 2, 3, 4, 5].map(star => (
           <button

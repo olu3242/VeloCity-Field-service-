@@ -10,7 +10,7 @@ let stripeClient: Stripe | null = null;
 export function getStripeServer() {
   if (!stripeClient) {
     stripeClient = new Stripe(requireEnv("STRIPE_SECRET_KEY"), {
-      apiVersion: "2024-04-10",
+      apiVersion: "2025-02-24.acacia",
       typescript: true,
     });
   }
