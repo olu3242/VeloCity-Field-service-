@@ -64,7 +64,7 @@ ALWAYS respond with valid JSON for transition analysis:
   async analyzeTransition(
     job: Partial<Job>,
     toStatus: JobStatus,
-    actorRole: "customer" | "provider" | "admin",
+    actorRole: import("@/types").UserRole,
     context: AgentContext = {}
   ): Promise<NovaTransitionOutput | null> {
     if (!hasEnv("ANTHROPIC_API_KEY")) {

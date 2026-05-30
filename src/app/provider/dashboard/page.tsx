@@ -32,7 +32,7 @@ export default async function ProviderDashboard() {
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (profile?.role !== "provider") redirect("/dashboard");
 
@@ -115,12 +115,18 @@ export default async function ProviderDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <Link href="/" className="font-bold text-xl text-velocity-700">⚡ VeloCity</Link>
+    <div className="min-h-screen bg-gray-950 text-white">
+      <nav className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="font-bold text-xl text-[#CCFF00]">⚡ VeloCity</Link>
+          <div className="flex items-center gap-1 text-xs">
+            <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-green-400">Provider</span>
+          </div>
+        </div>
         <div className="flex items-center gap-4">
           <OnlineToggle providerId={provider.id} isOnline={provider.is_online} />
-          <span className="text-sm text-gray-600">{profile?.full_name}</span>
+          <span className="text-sm text-white/60">{profile?.full_name}</span>
         </div>
       </nav>
 
@@ -297,7 +303,7 @@ export default async function ProviderDashboard() {
             <div className="space-y-2">
               {jobs.map((job: Job) => (
                 <Link key={job.id} href={`/provider/jobs/${job.id}`}>
-                  <div className="flex items-center justify-between rounded-lg border bg-white p-4 hover:border-velocity-300 transition-colors">
+                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 p-4 hover:border-[#CCFF00]/40 transition-colors">
                     <div className="flex items-center gap-3">
                       <span>{SERVICE_CATEGORY_ICONS[job.category]}</span>
                       <div>

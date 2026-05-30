@@ -35,20 +35,34 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Protect dashboard and portal routes
-  const protectedPaths = ["/dashboard", "/provider/dashboard", "/admin"];
+  // Protect all authenticated portal routes
+  const protectedPaths = ["/dashboard", "/provider", "/admin", "/dispatch", "/franchise"];
   const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
 
   if (isProtected && !user) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 
-  if (user && (pathname.startsWith("/admin") || pathname.startsWith("/provider"))) {
+  // Role-gate each portal
+  const roleProtected =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/provider") ||
+    pathname.startsWith("/dispatch") ||
+    pathname.startsWith("/franchise");
+
+  if (user && roleProtected) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-    if (pathname.startsWith("/admin") && profile?.role !== "admin") {
+    const role = profile?.role;
+    if (pathname.startsWith("/admin") && role !== "admin" && role !== "super_admin") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    if (pathname.startsWith("/provider") && profile?.role !== "provider") {
+    if (pathname.startsWith("/provider") && role !== "provider") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    if (pathname.startsWith("/dispatch") && role !== "dispatcher" && role !== "admin" && role !== "super_admin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    if (pathname.startsWith("/franchise") && role !== "franchise_owner" && role !== "admin" && role !== "super_admin") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }

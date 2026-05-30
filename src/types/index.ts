@@ -1,6 +1,12 @@
 // VeloCity Field Service — Core Types
 
-export type UserRole = "customer" | "provider" | "admin";
+export type UserRole =
+  | "customer"
+  | "provider"
+  | "dispatcher"
+  | "franchise_owner"
+  | "admin"
+  | "super_admin";
 
 export type ProviderStatus =
   | "pending"
