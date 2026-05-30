@@ -60,13 +60,23 @@ export default async function ProviderDashboard() {
     .order("offered_at", { ascending: false });
 
   // Tips received
-  const { data: tips } = await supabase
-    .from("provider_tips")
-    .select("id, job_id, amount_cents, note, payment_status, created_at")
-    .eq("provider_id", provider.id)
-    .eq("payment_status", "succeeded")
-    .order("created_at", { ascending: false })
-    .limit(10);
+  const [
+    { data: tips },
+    { count: activePeerCount },
+  ] = await Promise.all([
+    supabase
+      .from("provider_tips")
+      .select("id, job_id, amount_cents, note, payment_status, created_at")
+      .eq("provider_id", provider.id)
+      .eq("payment_status", "succeeded")
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("providers")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "approved")
+      .eq("is_online", true),
+  ]);
 
   const totalTipsCents = tips?.reduce((sum, t) => sum + (t.amount_cents ?? 0), 0) ?? 0;
 
@@ -110,8 +120,8 @@ export default async function ProviderDashboard() {
   const recommendedCategory = Object.keys(SERVICE_CATEGORY_LABELS).find((category) => !provider.categories?.includes(category)) ?? "handyman";
   const supplyGap = analyzeSupplyGap({
     category: recommendedCategory as keyof typeof SERVICE_CATEGORY_LABELS,
-    expectedJobs: 18,
-    activeProviders: 1,
+    expectedJobs: Math.max(completedJobs.length + (activeJobs?.length ?? 0) + 4, 8),
+    activeProviders: Math.max(activePeerCount ?? 1, 1),
   });
 
   return (

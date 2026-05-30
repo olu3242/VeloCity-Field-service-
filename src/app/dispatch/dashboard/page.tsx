@@ -2,16 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   formatCents,
-  formatDateTime,
-  JOB_STATUS_LABELS,
-  JOB_STATUS_COLORS,
-  SERVICE_CATEGORY_ICONS,
 } from "@/lib/utils";
-import type { Job } from "@/types";
+import { DispatchLiveQueue } from "@/components/dispatch/DispatchLiveQueue";
 
 export default async function DispatchDashboard() {
   const supabase = await createClient();
@@ -137,49 +132,7 @@ export default async function DispatchDashboard() {
         </div>
 
         {/* Jobs Queue */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Active Jobs Queue</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="text-[#CCFF00]"
-            >
-              <Link href="/admin/jobs">View all →</Link>
-            </Button>
-          </div>
-
-          {!activeJobs?.length ? (
-            <div className="rounded-lg border border-white/10 bg-gray-900 py-12 text-center text-white/40">
-              No active jobs right now.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {activeJobs.map((job: Job) => (
-                <Link key={job.id} href={`/admin/jobs/${job.id}`}>
-                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-gray-900 p-4 hover:bg-white/5 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">
-                        {SERVICE_CATEGORY_ICONS[job.category]}
-                      </span>
-                      <div>
-                        <div className="font-medium text-sm">{job.title}</div>
-                        <div className="text-xs text-white/40">
-                          {job.city}, {job.state} •{" "}
-                          {formatDateTime(job.created_at)}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge className={JOB_STATUS_COLORS[job.status]}>
-                      {JOB_STATUS_LABELS[job.status]}
-                    </Badge>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        <DispatchLiveQueue initialJobs={activeJobs ?? []} />
       </div>
     </div>
   );

@@ -73,15 +73,24 @@ export async function handleIvyDispute(
       });
     }
 
-    // Notify admin
-    await db.from("notifications").insert({
-      user_id: "admin", // placeholder — real admin notification would use admin user IDs
-      type: "dispute_update",
-      title: "New Dispute Requires Review",
-      body: `Dispute opened for job ${job_id}. IVY recommends: ${ivyData?.recommendation ?? "manual review"}.`,
-      channel: "in_app",
-      metadata: { job_id, dispute_id, ivy_recommendation: ivyData?.recommendation },
-    });
+    // Notify all admins about the new dispute
+    const { data: admins } = await db
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin");
+
+    if (admins?.length) {
+      await db.from("notifications").insert(
+        admins.map((admin: { id: string }) => ({
+          user_id: admin.id,
+          type: "dispute_update",
+          title: "New Dispute Requires Review",
+          body: `Dispute opened for job ${job_id}. IVY recommends: ${ivyData?.recommendation ?? "manual review"}.`,
+          channel: "in_app",
+          metadata: { job_id, dispute_id, ivy_recommendation: ivyData?.recommendation },
+        }))
+      );
+    }
 
     return {
       success: true,
