@@ -165,7 +165,7 @@ export const disputeSchema = z.object({
 export const tipSchema = z.object({
   job_id: z.string().uuid({ message: "job_id must be a valid UUID" }),
   amount_cents: z
-    .number({ required_error: "amount_cents is required" })
+    .number({ error: "amount_cents is required" })
     .int("amount_cents must be an integer")
     .min(100, "Minimum tip is $1.00")
     .max(100_000_00, "Maximum tip is $10,000"),
@@ -214,13 +214,13 @@ export const automationProcessSchema = z.object({
 export const agentRunSchema = z.object({
   tenant_id: z.string().uuid(),
   agent_name: z.string().trim().min(2).max(80),
-  input: z.record(z.unknown()).default({}),
-  context: z.record(z.unknown()).default({}),
+  input: z.record(z.string(), z.unknown()).default({}),
+  context: z.record(z.string(), z.unknown()).default({}),
 });
 
 export const messageCreateSchema = z.object({
   message: z.string().trim().min(1).max(4000),
-  attachments: z.array(z.record(z.unknown())).default([]),
+  attachments: z.array(z.record(z.string(), z.unknown())).default([]),
 });
 
 export const checkInSchema = z.object({

@@ -52,52 +52,27 @@ export async function routeAutomationEvent(
   const actions: string[] = [];
   const output: Record<string, unknown> = {};
 
-  switch (eventType) {
-    case "service_request_created":
-    case "serviceability_passed":
-    case "serviceability_failed": {
-      actions.push("ALICE.intake_review");
-      const description = String(payload.description ?? payload.title ?? "Service request");
-      output.alice = await runAgent(alice, `Automation intake review for ZIP ${String(payload.zip ?? "")}: ${description}`, { jobId, userId: payload.customer_id as string | undefined, tenantId });
-      break;
-    }
-    case "provider_offer_sent":
-    case "provider_offer_expired":
-    case "job_reassigned":
-    case "provider_penalty_applied":
-    case "no_provider_accepted": {
-      actions.push("MAX.dispatch_review");
-      output.max = await runAgent(max, `Automation dispatch review: ${eventType}. Payload: ${JSON.stringify(payload)}`, { jobId, tenantId });
-      break;
-    }
-    case "job_accepted":
-    case "job_state_changed":
-    case "job_started":
-    case "provider_arrived":
-    case "job_completed":
-    case "customer_confirmed":
-    case "sla_breach_detected":
-    case "sla_warning":
-    case "stuck_job_detected":
-    case "sla_warn":
-    case "sla_breach":
-    case "sla_escalate":
-    case "job_stuck":
-    case "provider_late": {
-      actions.push("NOVA.workflow_monitor");
-      output.nova = await runAgent(nova, `Automation workflow review: from ${String(payload.from_status ?? "unknown")} to ${String(payload.to_status ?? eventType)} by ${String(payload.actor_role ?? "admin")}. Payload: ${JSON.stringify(payload)}`, { jobId, tenantId });
-      if (eventType === "job_completed" || eventType === "customer_confirmed") {
-        actions.push("REX.quality_review", "LENA.retention_review");
-        output.rex = await runAgent(rex, `Automation quality review for completed job. Payload: ${JSON.stringify(payload)}`, { jobId, tenantId });
-        output.lena = await runAgent(lena, `Automation retention review after completion. Payload: ${JSON.stringify(payload)}`, { jobId, userId: payload.customer_id as string | undefined, tenantId });
+  const typedPayload = payload as AutomationPayload;
+  const queueItem = syntheticQueueItem(eventType, typedPayload);
+
+  try {
+    switch (eventType) {
+      // ── ALICE: Intake / Serviceability ──────────────────────────────────
+      case "service_request_created":
+      case "serviceability_passed":
+      case "serviceability_failed": {
+        actions.push("alice-intake");
+        const result = await handleAliceIntake(typedPayload, queueItem);
+        output.alice = result;
+        break;
       }
 
-      // ── MAX: Dispatch ───────────────────────────────────────────────────
+      // ── MAX + Provider Offer: Dispatch ──────────────────────────────────
       case "provider_offer_sent":
       case "provider_offer_expired":
       case "job_reassigned":
+      case "provider_penalty_applied":
       case "no_provider_accepted": {
-        // Provider offer flow first, then MAX dispatch
         actions.push("provider-offer", "max-dispatch");
         const offerResult = await handleProviderOffer(typedPayload, queueItem);
         output.offer = offerResult;
@@ -106,17 +81,18 @@ export async function routeAutomationEvent(
         break;
       }
 
-      // ── NOVA: Workflow ──────────────────────────────────────────────────
+      // ── NOVA: Workflow state transitions ────────────────────────────────
       case "job_accepted":
       case "job_state_changed":
-      case "job_started": {
+      case "job_started":
+      case "provider_arrived": {
         actions.push("nova-workflow");
         const result = await handleNovaWorkflow(typedPayload, queueItem);
         output.nova = result;
         break;
       }
 
-      // ── REX + LENA: Completion ──────────────────────────────────────────
+      // ── REX + NOVA: Completion ──────────────────────────────────────────
       case "job_completed":
       case "customer_confirmed": {
         actions.push("rex-completion", "nova-workflow");
@@ -127,7 +103,7 @@ export async function routeAutomationEvent(
         break;
       }
 
-      // ── QUINN: Quotes ───────────────────────────────────────────────────
+      // ── QUINN: Quotes & change orders ───────────────────────────────────
       case "quote_submitted":
       case "quote_validated":
       case "quote_flagged":
@@ -145,11 +121,12 @@ export async function routeAutomationEvent(
         break;
       }
 
-      // ── FINN: Finance & Payouts ─────────────────────────────────────────
+      // ── FINN: Payments ──────────────────────────────────────────────────
       case "payment_authorized":
       case "payment_captured":
       case "payment_failed":
       case "failed_payment_retry":
+      case "failed_notification_retry":
       case "refund_requested":
       case "refund_issued":
       case "chargeback_opened": {
@@ -159,6 +136,7 @@ export async function routeAutomationEvent(
         break;
       }
 
+      // ── FINN + Payout: Payouts ──────────────────────────────────────────
       case "payout_queued":
       case "payout_hold":
       case "payout_released":
@@ -205,6 +183,7 @@ export async function routeAutomationEvent(
       // ── SLA: Monitoring ─────────────────────────────────────────────────
       case "sla_breach_detected":
       case "stuck_job_detected":
+      case "sla_warning":
       case "sla_warn":
       case "sla_breach":
       case "sla_escalate":
@@ -216,7 +195,7 @@ export async function routeAutomationEvent(
         break;
       }
 
-      // ── TESS: Territory ─────────────────────────────────────────────────
+      // ── TESS: Territory & Growth ────────────────────────────────────────
       case "daily_territory_analysis":
       case "high_demand_area_detected":
       case "provider_shortage_detected":
@@ -244,7 +223,7 @@ export async function routeAutomationEvent(
         break;
       }
 
-      // ── TIPS ─────────────────────────────────────────────────────────────
+      // ── Tips ─────────────────────────────────────────────────────────────
       case "tip_submitted": {
         actions.push("tip-submitted");
         const result = await handleTipSubmitted(typedPayload, queueItem);
@@ -252,10 +231,9 @@ export async function routeAutomationEvent(
         break;
       }
 
-      // ── Default: GABRIEL governance ──────────────────────────────────────
+      // ── Default: GABRIEL governance audit ────────────────────────────────
       default: {
         actions.push("gabriel-governance");
-        // GABRIEL audit log for unhandled events
         await supabase.from("audit_logs").insert({
           action: `unhandled_event:${eventType}`,
           actor_id: typeof payload.actor_id === "string" ? payload.actor_id : null,
@@ -269,7 +247,6 @@ export async function routeAutomationEvent(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     output.error = msg;
-    // Still log to audit even on handler error
     await supabase.from("audit_logs").insert({
       action: `handler_error:${eventType}`,
       actor_id: null,

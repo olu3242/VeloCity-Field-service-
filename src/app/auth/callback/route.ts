@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { hasEnvGroup } from "@/lib/env";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
+
+  if (!hasEnvGroup("supabase")) {
+    return NextResponse.redirect(`${origin}/auth/login?error=supabase_not_configured`);
+  }
 
   if (code) {
     const supabase = await createClient();
@@ -15,7 +20,7 @@ export async function GET(request: NextRequest) {
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
-        .single();
+        .maybeSingle();
 
       if (profile?.role === "admin") return NextResponse.redirect(`${origin}/admin/dashboard`);
       if (profile?.role === "provider") return NextResponse.redirect(`${origin}/provider/dashboard`);

@@ -25,7 +25,7 @@ export default async function AdminDashboard() {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
   if (profile?.role !== "admin") redirect("/dashboard");
 
@@ -219,29 +219,31 @@ export default async function AdminDashboard() {
           </div>
         )}
 
-        {/* AI Agent Status */}
+        {/* AI Agent Status — active state driven by live platform signals */}
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-4">AI Agent Status</h2>
           <div className="grid grid-cols-5 gap-3">
-            {[
-              { name: "ALICE", role: "Intake", active: true },
-              { name: "MAX", role: "Dispatch", active: true },
-              { name: "QUINN", role: "Pricing", active: true },
-              { name: "NOVA", role: "Workflow", active: true },
-              { name: "REX", role: "Quality", active: true },
-              { name: "IVY", role: "Disputes", active: openDisputes ? true : false },
-              { name: "FINN", role: "Finance", active: true },
-              { name: "LENA", role: "Retention", active: true },
-              { name: "TESS", role: "Territory", active: true },
-              { name: "GABRIEL", role: "Compliance", active: pendingProviders ? true : false },
-            ].map((agent) => (
+            {(
+              [
+                { name: "ALICE",   domain: "Intake",      active: (totalJobs ?? 0) > 0 },
+                { name: "MAX",     domain: "Dispatch",    active: (activeJobs ?? 0) > 0 },
+                { name: "QUINN",   domain: "Pricing",     active: (totalJobs ?? 0) > 0 },
+                { name: "NOVA",    domain: "Workflow",    active: (activeJobs ?? 0) > 0 },
+                { name: "REX",     domain: "Quality",     active: (totalJobs ?? 0) > 0 },
+                { name: "IVY",     domain: "Disputes",    active: (openDisputes ?? 0) > 0 },
+                { name: "FINN",    domain: "Finance",     active: (totalJobs ?? 0) > 0 },
+                { name: "LENA",    domain: "Retention",   active: (totalJobs ?? 0) > 0 },
+                { name: "TESS",    domain: "Territory",   active: true },
+                { name: "GABRIEL", domain: "Compliance",  active: (pendingProviders ?? 0) > 0 },
+              ] as const
+            ).map((agent) => (
               <Card key={agent.name} className="bg-white/5 border-white/10">
                 <CardContent className="pt-4 pb-4 text-center">
                   <div className="flex items-center justify-center gap-1.5 mb-1">
-                    <div className={`h-2 w-2 rounded-full ${agent.active ? "bg-green-400 animate-pulse" : "bg-gray-500"}`} />
-                    <span className="font-bold text-velocity-300 text-sm">{agent.name}</span>
+                    <div className={`h-2 w-2 rounded-full ${agent.active ? "bg-green-400 animate-pulse" : "bg-gray-600"}`} />
+                    <span className="font-bold text-[#CCFF00] text-sm">{agent.name}</span>
                   </div>
-                  <div className="text-xs text-white/40">{agent.role}</div>
+                  <div className="text-xs text-white/40">{agent.domain}</div>
                 </CardContent>
               </Card>
             ))}

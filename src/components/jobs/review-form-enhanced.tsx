@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 export function ReviewFormEnhanced({ jobId, providerName }: { jobId: string; providerName: string }) {
   const [rating, setRating] = useState(0);
@@ -25,7 +26,7 @@ export function ReviewFormEnhanced({ jobId, providerName }: { jobId: string; pro
     <div className="text-center py-12">
       <div className="text-4xl mb-4">⭐</div>
       <h2 className="text-xl font-bold mb-2">Thanks for your review!</h2>
-      <a href={`/dashboard/jobs/${jobId}`} className="text-velocity-600 hover:underline">Back to job</a>
+      <Link href={`/dashboard/jobs/${jobId}`} className="text-velocity-600 hover:underline">Back to job</Link>
     </div>
   );
 

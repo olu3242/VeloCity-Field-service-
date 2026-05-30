@@ -3,7 +3,52 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProviderDocumentsList, ProviderJobsList, ProviderPayoutsList, RelatedList } from "@/components/related-lists";
-import { formatCents, formatDateTime } from "@/lib/utils";
+import { ProviderApprovalActions } from "@/components/admin/provider-actions";
+import { ProviderStatusButton } from "@/components/admin/provider-status-button";
+import { formatCents, formatDateTime, SERVICE_CATEGORY_ICONS, JOB_STATUS_COLORS, JOB_STATUS_LABELS } from "@/lib/utils";
+import type { ServiceCategory, JobStatus } from "@/types";
+
+interface ProviderData {
+  id: string;
+  user_id: string;
+  business_name: string;
+  bio?: string | null;
+  categories: ServiceCategory[];
+  service_radius_miles?: number | null;
+  hourly_rate_cents?: number | null;
+  years_experience?: number | null;
+  business_license?: string | null;
+  insurance_number?: string | null;
+  insurance_expiry?: string | null;
+  status: string;
+  trust_score?: number | null;
+  completed_jobs?: number | null;
+  tenant_id: string;
+  created_at: string;
+  profiles?: { full_name?: string | null; email?: string | null; created_at?: string | null } | null;
+}
+
+interface JobRow {
+  id: string;
+  title: string;
+  status: string;
+  category: string;
+  final_cost_cents?: number | null;
+  created_at: string;
+}
+
+interface TipRow {
+  amount_cents: number;
+  created_at: string;
+  payment_status: string;
+}
+
+interface ReviewRow {
+  rating: number;
+  comment?: string | null;
+  created_at: string;
+  job_id?: string | null;
+}
 
 export default async function AdminProviderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -62,6 +107,8 @@ export default async function AdminProviderDetailPage({ params }: { params: Prom
     : provider.status === "pending"
     ? "bg-yellow-800 text-yellow-200"
     : "bg-red-800 text-red-200";
+
+  const tenantId = provider.tenant_id;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -251,22 +298,20 @@ export default async function AdminProviderDetailPage({ params }: { params: Prom
                   <span className="text-white/50">Tips</span>
                   <span className="text-emerald-400 font-medium">{formatCents(totalTips)}</span>
                 </div>
-                <div className="text-xs text-gray-500">{formatDateTime(payout.created_at)}</div>
-              </div>
-            ))}
-            {!payouts?.length && <p className="text-sm text-gray-500">No payout records found.</p>}
-          </CardContent>
-        </Card>
-      </section>
+              </CardContent>
+            </Card>
+          </div>{/* end Sidebar */}
+        </div>{/* end grid */}
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-2">
-        <ProviderJobsList tenantId={tenantId} providerId={provider.id} />
-        <ProviderDocumentsList tenantId={tenantId} providerId={provider.id} />
-        <RelatedList title="Provider Availability" table="provider_availability" tenantId={tenantId} filters={[{ column: "provider_id", value: provider.id }]} primaryColumn="day_of_week" statusColumn="is_active" secondaryColumn="start_time" />
-        <RelatedList title="Provider Reviews" table="reviews" tenantId={tenantId} filters={[{ column: "reviewee_id", value: provider.user_id }]} primaryColumn="comment" statusColumn="rating" />
-        <ProviderPayoutsList tenantId={tenantId} providerId={provider.id} />
-        <RelatedList title="Provider Disputes" table="disputes" tenantId={tenantId} filters={[{ column: "against", value: provider.user_id }]} primaryColumn="reason" statusColumn="status" href={(row) => `/admin/disputes/${row.id}`} />
-      </section>
-    </main>
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <ProviderJobsList tenantId={tenantId} providerId={provider.id} />
+          <ProviderDocumentsList tenantId={tenantId} providerId={provider.id} />
+          <RelatedList title="Provider Availability" table="provider_availability" tenantId={tenantId} filters={[{ column: "provider_id", value: provider.id }]} primaryColumn="day_of_week" statusColumn="is_active" secondaryColumn="start_time" />
+          <RelatedList title="Provider Reviews" table="reviews" tenantId={tenantId} filters={[{ column: "reviewee_id", value: provider.user_id }]} primaryColumn="comment" statusColumn="rating" />
+          <ProviderPayoutsList tenantId={tenantId} providerId={provider.id} />
+          <RelatedList title="Provider Disputes" table="disputes" tenantId={tenantId} filters={[{ column: "against", value: provider.user_id }]} primaryColumn="reason" statusColumn="status" href={(row) => `/admin/disputes/${row.id}`} />
+        </div>
+      </div>{/* end max-w-7xl */}
+    </div>
   );
 }

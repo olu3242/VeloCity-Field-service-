@@ -1,0 +1,25 @@
+:root {
+  /* Velocity Brand Colors */
+  --velocity-volt: #CCFF00;
+  --velocity-volt-dark: #AACC00;
+  --velocity-black: #0A0A0A;
+  --velocity-carbon: #111827;
+  --velocity-white: #F9FAFB;
+  --velocity-accent: #6070F2;
+
+  /* Semantic tokens */
+  --velocity-bg-primary: var(--velocity-black);
+  --velocity-bg-surface: var(--velocity-carbon);
+  --velocity-text-primary: var(--velocity-white);
+  --velocity-text-accent: var(--velocity-volt);
+  --velocity-border: rgba(255,255,255,0.1);
+
+  /* Motion */
+  --velocity-transition-fast: 150ms ease;
+  --velocity-transition-base: 250ms ease;
+  --velocity-transition-slow: 400ms ease;
+
+  /* Typography */
+  --velocity-font-display: system-ui, -apple-system, sans-serif;
+  --velocity-font-body: system-ui, -apple-system, sans-serif;
+}

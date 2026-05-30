@@ -23,10 +23,12 @@ export default async function CustomerDashboard() {
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (profile?.role === "admin") redirect("/admin/dashboard");
+  if (profile?.role === "admin" || profile?.role === "super_admin") redirect("/admin/dashboard");
   if (profile?.role === "provider") redirect("/provider/dashboard");
+  if (profile?.role === "dispatcher") redirect("/dispatch/dashboard");
+  if (profile?.role === "franchise_owner") redirect("/franchise/dashboard");
 
   const { data: jobs } = await supabase
     .from("jobs")

@@ -59,6 +59,7 @@ export const AUTOMATION_EVENT_TYPES = [
   "franchise_candidate_area_detected",
   "cancellation_fee_applied",
   "provider_penalty_applied",
+  "tip_submitted",
 ] as const;
 
 export type AutomationEventType = (typeof AUTOMATION_EVENT_TYPES)[number];

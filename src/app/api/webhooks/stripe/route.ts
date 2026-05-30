@@ -137,6 +137,33 @@ export async function POST(request: NextRequest) {
         });
         if (receipt?.id) await supabase.from("jobs").update({ receipt_id: receipt.id }).eq("id", job_id).eq("tenant_id", tenantId);
       }
+
+      // Revenue attribution record
+      const royaltyRate = 0.08; // 8% franchise royalty of platform fee
+      const platformFeeCents = Math.round((intent.amount ?? 0) * 0.18);
+      const providerPayoutCents = (intent.amount ?? 0) - platformFeeCents;
+      const franchiseRoyaltyCents = Math.round(platformFeeCents * royaltyRate);
+
+      const { data: payment } = await supabase
+        .from("payments")
+        .select("id")
+        .eq("stripe_payment_intent_id", intent.id)
+        .maybeSingle();
+
+      await getAdminClient()
+        .from("revenue_records")
+        .insert({
+          tenant_id: intent.metadata?.tenant_id ?? DEFAULT_TENANT_ID,
+          job_id: intent.metadata?.job_id ?? null,
+          payment_id: payment?.id ?? null,
+          event_type: "payment_captured",
+          gross_amount_cents: intent.amount ?? 0,
+          platform_fee_cents: platformFeeCents,
+          provider_payout_cents: providerPayoutCents,
+          franchise_royalty_cents: franchiseRoyaltyCents,
+          metadata: { stripe_payment_intent_id: intent.id },
+        })
+        .then(() => null); // non-blocking
       break;
     }
 
