@@ -16,10 +16,16 @@ export function isValidSupabaseUrl(value: string | undefined): value is string {
 }
 
 export function getSupabaseConfig(): SupabaseConfig | null {
-  const url = env.supabase.url;
-  const anonKey = env.supabase.anonKey;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!isValidSupabaseUrl(url) || !isConfiguredValue(anonKey)) {
+  console.log("SUPABASE URL:", url);
+  console.log(
+    "SUPABASE ANON:",
+    anonKey ? `PRESENT (${anonKey.length} chars)` : "MISSING"
+  );
+
+  if (!url || !anonKey) {
     return null;
   }
 
