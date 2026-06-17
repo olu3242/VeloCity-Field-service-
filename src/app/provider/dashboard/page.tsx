@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { OfferActions } from "@/components/jobs/offer-actions";
 import { OnlineToggle } from "@/components/provider/online-toggle";
 import {
@@ -153,30 +155,10 @@ export default async function ProviderDashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-velocity-700">{offers?.length ?? 0}</div>
-              <div className="text-sm text-gray-500 mt-1">New Offers</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold">{activeJobs?.length ?? 0}</div>
-              <div className="text-sm text-gray-500 mt-1">Active Jobs</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-green-700">{formatCents(todayEarnings)}</div>
-              <div className="text-sm text-gray-500 mt-1">Today&apos;s Earnings</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold">{(provider.trust_score * 100).toFixed(0)}%</div>
-              <div className="text-sm text-gray-500 mt-1">Trust Score</div>
-            </CardContent>
-          </Card>
+          <StatCard variant="dark" label="New Offers" value={offers?.length ?? 0} valueClassName="text-velocity-700" />
+          <StatCard variant="dark" label="Active Jobs" value={activeJobs?.length ?? 0} />
+          <StatCard variant="dark" label="Today's Earnings" value={formatCents(todayEarnings)} valueClassName="text-green-700" />
+          <StatCard variant="dark" label="Trust Score" value={`${(provider.trust_score * 100).toFixed(0)}%`} />
         </div>
 
         {/* Growth Intelligence */}
@@ -304,11 +286,12 @@ export default async function ProviderDashboard() {
         <div>
           <h2 className="text-lg font-semibold mb-4">All Jobs</h2>
           {!jobs?.length ? (
-            <Card>
-              <CardContent className="py-12 text-center text-gray-500">
-                No jobs yet. Make sure you&apos;re online to receive offers!
-              </CardContent>
-            </Card>
+            <EmptyState
+              variant="dark"
+              icon="📋"
+              title="No jobs yet"
+              description="Make sure you're online to start receiving job offers in your area."
+            />
           ) : (
             <div className="space-y-2">
               {jobs.map((job: Job) => (

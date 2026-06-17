@@ -1,11 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  formatCents,
-} from "@/lib/utils";
+import { StatCard } from "@/components/ui/stat-card";
 import { DispatchLiveQueue } from "@/components/dispatch/DispatchLiveQueue";
 
 export default async function DispatchDashboard() {
@@ -120,14 +117,13 @@ export default async function DispatchDashboard() {
               color: "text-white",
             },
           ].map((kpi) => (
-            <Card key={kpi.label} className="bg-gray-900 border-white/10">
-              <CardContent className="pt-6">
-                <div className={`text-4xl font-bold ${kpi.color}`}>
-                  {kpi.value}
-                </div>
-                <div className="text-sm text-white/50 mt-1">{kpi.label}</div>
-              </CardContent>
-            </Card>
+            <StatCard
+              key={kpi.label}
+              variant="dark"
+              label={kpi.label}
+              value={kpi.value}
+              valueClassName={kpi.color}
+            />
           ))}
         </div>
 

@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -59,30 +61,21 @@ export default async function CustomerDashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-velocity-700">{activeJobs?.length ?? 0}</div>
-              <div className="text-sm text-gray-500 mt-1">Active Jobs</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-gray-900">
-                {jobs?.filter((j) => j.status === "completed").length ?? 0}
-              </div>
-              <div className="text-sm text-gray-500 mt-1">Completed</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-gray-900">
-                {formatCents(
-                  jobs?.reduce((sum, j) => sum + (j.final_cost_cents ?? j.quoted_cost_cents ?? 0), 0) ?? 0
-                )}
-              </div>
-              <div className="text-sm text-gray-500 mt-1">Total Spent</div>
-            </CardContent>
-          </Card>
+          <StatCard
+            label="Active Jobs"
+            value={activeJobs?.length ?? 0}
+            valueClassName="text-velocity-700"
+          />
+          <StatCard
+            label="Completed"
+            value={jobs?.filter((j) => j.status === "completed").length ?? 0}
+          />
+          <StatCard
+            label="Total Spent"
+            value={formatCents(
+              jobs?.reduce((sum, j) => sum + (j.final_cost_cents ?? j.quoted_cost_cents ?? 0), 0) ?? 0
+            )}
+          />
         </div>
 
         {/* Active Jobs */}
@@ -129,14 +122,12 @@ export default async function CustomerDashboard() {
           </div>
 
           {!jobs?.length ? (
-            <Card>
-              <CardContent className="py-16 text-center">
-                <p className="text-gray-500 mb-4">No jobs yet. Book your first service!</p>
-                <Button asChild>
-                  <Link href="/book">Book a Service</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon="🧰"
+              title="No jobs yet"
+              description="Book your first service and we'll match you with a verified local provider."
+              action={{ label: "Book a Service", href: "/book" }}
+            />
           ) : (
             <div className="space-y-2">
               {jobs.map((job: Job) => (
