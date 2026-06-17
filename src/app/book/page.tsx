@@ -103,7 +103,7 @@ function BookingForm() {
           {step === 1 && (
             <div>
               <h2 className="text-xl font-semibold mb-6">What type of service do you need?</h2>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {CATEGORIES.map((cat) => (
                   <button
                     key={cat}

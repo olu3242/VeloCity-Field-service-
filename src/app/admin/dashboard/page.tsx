@@ -225,7 +225,7 @@ export default async function AdminDashboard() {
         {/* AI Agent Status — active state driven by live platform signals */}
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-4">AI Agent Status</h2>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {(
               [
                 { name: "ALICE",   domain: "Intake",      active: (totalJobs ?? 0) > 0 },

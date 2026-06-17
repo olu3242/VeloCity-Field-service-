@@ -154,7 +154,7 @@ export default async function ProviderDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard variant="dark" label="New Offers" value={offers?.length ?? 0} valueClassName="text-velocity-700" />
           <StatCard variant="dark" label="Active Jobs" value={activeJobs?.length ?? 0} />
           <StatCard variant="dark" label="Today's Earnings" value={formatCents(todayEarnings)} valueClassName="text-green-700" />

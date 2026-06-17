@@ -60,7 +60,7 @@ export default async function CustomerDashboard() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">My Dashboard</h1>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <StatCard
             label="Active Jobs"
             value={activeJobs?.length ?? 0}

@@ -11,7 +11,7 @@ export default function DispatchPortalLoading() {
         </div>
       </div>
       <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[0,1,2,3].map(i => (
             <div key={i} className="bg-white/5 rounded-lg border border-white/10 p-6">
               <div className="h-9 w-16 bg-white/10 rounded animate-pulse mb-2" />
