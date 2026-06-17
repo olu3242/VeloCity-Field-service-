@@ -1,8 +1,11 @@
 import { getAdminClient } from "@/lib/supabase/admin";
 import { hasEnvGroup } from "@/lib/env";
+import { SERVICE_CATEGORY_LABELS } from "@/lib/utils";
 import { LandingPage, type LandingStats, type LandingTestimonial } from "@/components/landing/LandingPage";
 
 export const dynamic = "force-dynamic";
+
+const CATEGORY_COUNT = Object.keys(SERVICE_CATEGORY_LABELS).length;
 
 const EMPTY_STATS: LandingStats = {
   activeJobsToday: 0,
@@ -10,6 +13,7 @@ const EMPTY_STATS: LandingStats = {
   providerCount: 0,
   avgRating: null,
   reviewCount: 0,
+  categoryCount: CATEGORY_COUNT,
 };
 
 export default async function HomePage() {
@@ -55,6 +59,7 @@ export default async function HomePage() {
     providerCount: providerCount ?? 0,
     avgRating,
     reviewCount: ratings.length,
+    categoryCount: CATEGORY_COUNT,
   };
 
   const testimonials: LandingTestimonial[] = (reviews ?? [])

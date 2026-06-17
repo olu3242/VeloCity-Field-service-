@@ -9,6 +9,7 @@ export interface LandingStats {
   providerCount: number;
   avgRating: number | null;
   reviewCount: number;
+  categoryCount: number;
 }
 
 export interface LandingTestimonial {
@@ -200,7 +201,7 @@ export function LandingPage({ stats, testimonials }: { stats: LandingStats; test
           <div className="stat-label">Active Jobs Today</div>
         </div>
         <div className="stat-item">
-          <div className="stat-number">12</div>
+          <div className="stat-number">{stats.categoryCount}</div>
           <div className="stat-label">Service Categories</div>
         </div>
         <div className="stat-item">
