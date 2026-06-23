@@ -48,6 +48,19 @@ export async function POST(request: NextRequest) {
   const tax = Math.round(subtotal * 0.0825);
   const total = subtotal + tax;
   const deposit = Math.round(total * 0.3);
+
+  // Service Catalog: use a data-driven pricing profile when one exists for
+  // this category/tier, falling back to the hardcoded pricing rules otherwise.
+  const tier = job.urgency === "emergency" ? "emergency" : "standard";
+  const { data: pricingProfileRow } = await supabase
+    .from("service_pricing_profiles")
+    .select("base_price_cents, labor_rate_cents, travel_fee_cents, urgency_multiplier, commercial_multiplier")
+    .eq("tenant_id", tenantId)
+    .eq("category", job.category)
+    .eq("tier", tier)
+    .eq("is_active", true)
+    .maybeSingle();
+
   const pricingResult = calculatePrice({
     category: job.category as ServiceCategory,
     urgency: job.urgency as UrgencyLevel,
@@ -57,6 +70,7 @@ export async function POST(request: NextRequest) {
     complexity: "moderate",
     materialsEstimateCents: lineItems.filter((item) => item.type === "parts").reduce((sum, item) => sum + item.total_cents, 0),
     quotedAmountCents: total,
+    pricingProfile: pricingProfileRow ?? undefined,
   });
   const quoteValidation = validateQuote(total, pricingResult);
 

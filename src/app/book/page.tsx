@@ -17,12 +17,31 @@ import type { ServiceCategory, UrgencyLevel } from "@/types";
 const CATEGORIES = Object.keys(SERVICE_CATEGORY_LABELS) as ServiceCategory[];
 const URGENCIES = Object.keys(URGENCY_LABELS) as UrgencyLevel[];
 
+interface ServicePackage {
+  id: string;
+  tier: string;
+  name: string;
+  description: string | null;
+  price_cents: number | null;
+}
+
+interface ServiceType {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  default_duration_minutes: number | null;
+  service_packages: ServicePackage[];
+}
+
+type Step = "category" | "serviceType" | "details" | "address";
+
 function BookingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const defaultCategory = searchParams.get("category") as ServiceCategory | null;
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<Step>("category");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +54,34 @@ function BookingForm() {
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
+
+  const [serviceTypes, setServiceTypes] = useState<ServiceType[]>([]);
+  const [loadingServiceTypes, setLoadingServiceTypes] = useState(false);
+  const [serviceTypeId, setServiceTypeId] = useState<string | null>(null);
+  const [servicePackageId, setServicePackageId] = useState<string | null>(null);
+
+  const STEP_ORDER: Step[] = serviceTypes.length > 0
+    ? ["category", "serviceType", "details", "address"]
+    : ["category", "details", "address"];
+
+  async function goToServiceTypeOrDetails() {
+    if (!category) return;
+    setLoadingServiceTypes(true);
+    setServiceTypeId(null);
+    setServicePackageId(null);
+    try {
+      const res = await fetch(`/api/service-types?category=${category}`);
+      const { data } = await res.json();
+      const types: ServiceType[] = data ?? [];
+      setServiceTypes(types);
+      setStep(types.length > 0 ? "serviceType" : "details");
+    } catch {
+      setServiceTypes([]);
+      setStep("details");
+    } finally {
+      setLoadingServiceTypes(false);
+    }
+  }
 
   async function handleSubmit() {
     setLoading(true);
@@ -55,6 +102,8 @@ function BookingForm() {
           zip,
           preferred_date: preferredDate || undefined,
           photo_urls: [],
+          service_type_id: serviceTypeId ?? undefined,
+          service_package_id: servicePackageId ?? undefined,
         }),
       });
 
@@ -81,12 +130,12 @@ function BookingForm() {
 
         {/* Progress */}
         <div className="flex items-center gap-2 mb-8">
-          {[1, 2, 3].map((s) => (
+          {STEP_ORDER.map((s) => (
             <div
               key={s}
               className={cn(
                 "h-2 flex-1 rounded-full transition-colors",
-                step >= s ? "bg-velocity-600" : "bg-gray-200"
+                STEP_ORDER.indexOf(step) >= STEP_ORDER.indexOf(s) ? "bg-velocity-600" : "bg-gray-200"
               )}
             />
           ))}
@@ -99,8 +148,8 @@ function BookingForm() {
             </div>
           )}
 
-          {/* Step 1: Category */}
-          {step === 1 && (
+          {/* Step: Category */}
+          {step === "category" && (
             <div>
               <h2 className="text-xl font-semibold mb-6">What type of service do you need?</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -122,16 +171,78 @@ function BookingForm() {
               </div>
               <Button
                 className="w-full mt-6"
-                disabled={!category}
-                onClick={() => setStep(2)}
+                disabled={!category || loadingServiceTypes}
+                onClick={goToServiceTypeOrDetails}
               >
-                Continue
+                {loadingServiceTypes ? "Loading..." : "Continue"}
               </Button>
             </div>
           )}
 
-          {/* Step 2: Details */}
-          {step === 2 && (
+          {/* Step: Service type & package (only when configured for this category) */}
+          {step === "serviceType" && (
+            <div className="space-y-5">
+              <h2 className="text-xl font-semibold">Narrow down the service (optional)</h2>
+              <p className="text-sm text-gray-500">Pick a specific service type and package, or skip to continue with a general request.</p>
+
+              <div className="space-y-3">
+                {serviceTypes.map((st) => (
+                  <div key={st.id}>
+                    <button
+                      onClick={() => {
+                        setServiceTypeId(st.id);
+                        setServicePackageId(null);
+                      }}
+                      className={cn(
+                        "w-full rounded-lg border p-4 text-left transition-all hover:border-velocity-400",
+                        serviceTypeId === st.id
+                          ? "border-velocity-600 bg-velocity-50 text-velocity-700"
+                          : "border-gray-200"
+                      )}
+                    >
+                      <div className="font-medium">{st.name}</div>
+                      {st.description && <div className="text-xs text-gray-500 mt-1">{st.description}</div>}
+                    </button>
+
+                    {serviceTypeId === st.id && st.service_packages.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2 mt-2 pl-2">
+                        {st.service_packages.map((pkg) => (
+                          <button
+                            key={pkg.id}
+                            onClick={() => setServicePackageId(pkg.id)}
+                            className={cn(
+                              "rounded-lg border p-3 text-left text-sm transition-all",
+                              servicePackageId === pkg.id
+                                ? "border-velocity-600 bg-velocity-50 text-velocity-700"
+                                : "border-gray-200 hover:border-gray-300"
+                            )}
+                          >
+                            <div className="font-medium">{pkg.name}</div>
+                            {pkg.price_cents != null && (
+                              <div className="text-xs text-gray-500 mt-0.5">${(pkg.price_cents / 100).toFixed(2)}</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" onClick={() => setStep("category")} className="flex-1">Back</Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => setStep("details")}
+                >
+                  {serviceTypeId ? "Continue" : "Skip"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step: Details */}
+          {step === "details" && (
             <div className="space-y-5">
               <h2 className="text-xl font-semibold">Describe the job</h2>
 
@@ -179,11 +290,17 @@ function BookingForm() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" onClick={() => setStep(1)} className="flex-1">Back</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(serviceTypes.length > 0 ? "serviceType" : "category")}
+                  className="flex-1"
+                >
+                  Back
+                </Button>
                 <Button
                   className="flex-1"
                   disabled={!title || !description}
-                  onClick={() => setStep(3)}
+                  onClick={() => setStep("address")}
                 >
                   Continue
                 </Button>
@@ -191,8 +308,8 @@ function BookingForm() {
             </div>
           )}
 
-          {/* Step 3: Address & Schedule */}
-          {step === 3 && (
+          {/* Step: Address & Schedule */}
+          {step === "address" && (
             <div className="space-y-5">
               <h2 className="text-xl font-semibold">Where & when?</h2>
 
@@ -236,7 +353,7 @@ function BookingForm() {
               )}
 
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" onClick={() => setStep(2)} className="flex-1">Back</Button>
+                <Button variant="outline" onClick={() => setStep("details")} className="flex-1">Back</Button>
                 <Button
                   className="flex-1"
                   disabled={!street || !city || !state || !zip || loading}

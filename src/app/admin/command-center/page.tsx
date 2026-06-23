@@ -19,7 +19,50 @@ import { calculateRetentionProbabilityScore, calculateTerritoryHealthScore } fro
 import { calculateCommission } from "@/lib/revenue";
 import { analyzeSupplyGap } from "@/lib/expansion";
 import { getTenantId } from "@/lib/tenancy";
+import { AGENT_REGISTRY } from "@/lib/agents/registry";
 import type { Job, Payment, Provider, ServiceCategory } from "@/types";
+
+interface AgentLogRow {
+  id: string;
+  agent_name: string;
+  action: string | null;
+  error: string | null;
+  latency_ms: number | null;
+  created_at: string;
+}
+
+interface AgentActivitySummary {
+  name: string;
+  capability: string;
+  executionCount: number;
+  successCount: number;
+  failureCount: number;
+  successRatePct: number | null;
+  lastExecutionAt: string | null;
+  avgRuntimeMs: number | null;
+}
+
+function buildAgentActivitySummary(agentLogs: AgentLogRow[]): AgentActivitySummary[] {
+  return Object.values(AGENT_REGISTRY).map((registration) => {
+    const logs = agentLogs.filter((log) => log.agent_name === registration.name);
+    const failureCount = logs.filter((log) => Boolean(log.error)).length;
+    const executionCount = logs.length;
+    const runtimes = logs.map((log) => log.latency_ms).filter((ms): ms is number => typeof ms === "number");
+    const lastExecutionAt = logs
+      .map((log) => log.created_at)
+      .sort((a, b) => b.localeCompare(a))[0] ?? null;
+    return {
+      name: registration.name,
+      capability: registration.capability_type,
+      executionCount,
+      successCount: executionCount - failureCount,
+      failureCount,
+      successRatePct: executionCount ? Math.round(((executionCount - failureCount) / executionCount) * 100) : null,
+      lastExecutionAt,
+      avgRuntimeMs: runtimes.length ? Math.round(runtimes.reduce((sum, ms) => sum + ms, 0) / runtimes.length) : null,
+    };
+  });
+}
 
 const DONE_STATUSES = ["completed", "closed"];
 const INACTIVE_STATUSES = ["completed", "closed", "cancelled", "expired", "refunded"];
@@ -82,12 +125,13 @@ export default async function AdminCommandCenterPage() {
     { data: settingsAudits },
     { data: personaAssignments },
     { data: profiles },
+    { data: serviceTypes },
   ] = await Promise.all([
     supabase.from("jobs").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(500),
     supabase.from("providers").select("*").eq("tenant_id", tenantId).limit(500),
     supabase.from("payments").select("*").eq("tenant_id", tenantId).limit(500),
     supabase.from("disputes").select("*").eq("tenant_id", tenantId).limit(200),
-    supabase.from("agent_logs").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("agent_logs").select("id,agent_name,action,error,latency_ms,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(500),
     supabase.from("service_areas").select("*").eq("tenant_id", tenantId).limit(50),
     supabase.from("automation_queue").select("id,status,retry_count,error_message,event_type,processed_at,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
     supabase.from("pricing_decisions").select("id,status,risk_flags,confidence_score,final_price,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100),
@@ -97,6 +141,7 @@ export default async function AdminCommandCenterPage() {
     supabase.from("settings_audit_logs").select("id,setting_type,setting_key,action,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(50),
     supabase.from("persona_assignments").select("id,user_id,personas(key,name)").eq("tenant_id", tenantId).eq("is_active", true).limit(200),
     supabase.from("profiles").select("id,role,created_at").eq("tenant_id", tenantId).limit(200),
+    supabase.from("service_types").select("id,name,category").eq("tenant_id", tenantId).eq("is_active", true).limit(200),
   ]);
 
   const jobRows = (jobs ?? []) as Job[];
@@ -199,6 +244,39 @@ export default async function AdminCommandCenterPage() {
         completedJobs: completedJobs.length,
       }
     : buildFallbackMetrics();
+
+  const agentActivity = buildAgentActivitySummary((agentLogs ?? []) as AgentLogRow[]);
+
+  // Service Catalog: revenue and job-count breakdown by configured service
+  // type, plus how much completed volume is still category-only (no service
+  // type selected), reusing the same in-memory aggregation pattern as the
+  // rest of this dashboard rather than a new reporting table.
+  const serviceTypeRows = serviceTypes ?? [];
+  const serviceTypeNameById = new Map(serviceTypeRows.map((st) => [st.id, st.name]));
+  const serviceTypeCategoryById = new Map(serviceTypeRows.map((st) => [st.id, st.category]));
+  const serviceTypeBreakdownMap = new Map<string, { jobs: number; revenueCents: number }>();
+  let unclassifiedJobs = 0;
+  let unclassifiedRevenueCents = 0;
+  completedJobs.forEach((job) => {
+    const amount = job.final_cost_cents ?? job.quoted_cost_cents ?? 0;
+    if (!job.service_type_id) {
+      unclassifiedJobs += 1;
+      unclassifiedRevenueCents += amount;
+      return;
+    }
+    const existing = serviceTypeBreakdownMap.get(job.service_type_id) ?? { jobs: 0, revenueCents: 0 };
+    existing.jobs += 1;
+    existing.revenueCents += amount;
+    serviceTypeBreakdownMap.set(job.service_type_id, existing);
+  });
+  const serviceTypeBreakdown = Array.from(serviceTypeBreakdownMap.entries())
+    .map(([serviceTypeId, stats]) => ({
+      serviceTypeId,
+      name: serviceTypeNameById.get(serviceTypeId) ?? "Unknown service type",
+      category: serviceTypeCategoryById.get(serviceTypeId) ?? "—",
+      ...stats,
+    }))
+    .sort((a, b) => b.revenueCents - a.revenueCents);
 
   const ops = calculateOpsHealthScore(metrics);
   const revenue = calculateRevenueHealthScore(metrics);
@@ -451,18 +529,6 @@ export default async function AdminCommandCenterPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>AI Agent Activity</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {(agentLogs ?? []).slice(0, 5).map((log) => (
-                <div key={log.id} className="rounded-md bg-gray-100 p-3 text-sm">
-                  <div className="font-medium">{log.agent_name}</div>
-                  <div className="text-xs text-gray-500">{log.action}</div>
-                </div>
-              ))}
-              {!agentLogs?.length && <p className="text-sm text-gray-500">No recent agent activity.</p>}
-            </CardContent>
-          </Card>
-          <Card>
             <CardHeader><CardTitle>Territory Expansion</CardTitle></CardHeader>
             <CardContent>
               <div className="text-4xl font-bold">{metrics.territoryReadiness}</div>
@@ -470,6 +536,89 @@ export default async function AdminCommandCenterPage() {
                 Based on {serviceAreas?.length ?? 0} service areas, {metrics.activeProviders} online providers, and {metrics.completedJobs} completed jobs.
               </p>
               <Button asChild className="mt-4 w-full"><Link href="/admin/growth">Open Growth Dashboard</Link></Button>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="mt-6">
+          <Card>
+            <CardHeader><CardTitle>Service Catalog Revenue Breakdown</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b text-xs uppercase text-gray-500">
+                      <th className="py-2 pr-4">Service Type</th>
+                      <th className="py-2 pr-4">Category</th>
+                      <th className="py-2 pr-4">Completed Jobs</th>
+                      <th className="py-2 pr-4">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceTypeBreakdown.map((row) => (
+                      <tr key={row.serviceTypeId} className="border-b last:border-0">
+                        <td className="py-2 pr-4 font-medium">{row.name}</td>
+                        <td className="py-2 pr-4 capitalize text-gray-600">{String(row.category).replace("_", " ")}</td>
+                        <td className="py-2 pr-4">{row.jobs}</td>
+                        <td className="py-2 pr-4">{formatCents(row.revenueCents)}</td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td className="py-2 pr-4 text-gray-500">Unclassified (category only)</td>
+                      <td className="py-2 pr-4 text-gray-500">—</td>
+                      <td className="py-2 pr-4 text-gray-500">{unclassifiedJobs}</td>
+                      <td className="py-2 pr-4 text-gray-500">{formatCents(unclassifiedRevenueCents)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                {!serviceTypeBreakdown.length && (
+                  <p className="mt-3 text-sm text-gray-500">No completed jobs have a service type selected yet.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="mt-6">
+          <Card>
+            <CardHeader><CardTitle>AI Agent Activity</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b text-xs uppercase text-gray-500">
+                      <th className="py-2 pr-4">Agent</th>
+                      <th className="py-2 pr-4">Capability</th>
+                      <th className="py-2 pr-4">Executions</th>
+                      <th className="py-2 pr-4">Success Rate</th>
+                      <th className="py-2 pr-4">Avg Runtime</th>
+                      <th className="py-2 pr-4">Last Execution</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {agentActivity.map((agent) => (
+                      <tr key={agent.name} className="border-b last:border-0">
+                        <td className="py-2 pr-4 font-medium">{agent.name}</td>
+                        <td className="py-2 pr-4 capitalize text-gray-600">{agent.capability}</td>
+                        <td className="py-2 pr-4">{agent.executionCount}</td>
+                        <td className="py-2 pr-4">
+                          {agent.successRatePct === null ? (
+                            <span className="text-gray-400">No runs yet</span>
+                          ) : (
+                            <Badge variant={agent.successRatePct >= 95 ? "success" : agent.successRatePct >= 80 ? "warning" : "destructive"}>
+                              {agent.successRatePct}%
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="py-2 pr-4">{agent.avgRuntimeMs !== null ? `${agent.avgRuntimeMs}ms` : "—"}</td>
+                        <td className="py-2 pr-4 text-gray-500">
+                          {agent.lastExecutionAt ? new Date(agent.lastExecutionAt).toLocaleString() : "Never"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         </section>

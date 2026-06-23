@@ -167,6 +167,8 @@ export interface Job {
   customer_id: string;
   provider_id: string | null;
   category: ServiceCategory;
+  service_type_id: string | null;
+  service_package_id: string | null;
   title: string;
   description: string;
   urgency: UrgencyLevel;

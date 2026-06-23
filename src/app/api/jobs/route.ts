@@ -119,6 +119,8 @@ export async function POST(request: NextRequest) {
       document_urls: [],
       ai_classification: classification ?? {},
       ai_match_scores: {},
+      service_type_id: body.service_type_id ?? null,
+      service_package_id: body.service_package_id ?? null,
     })
     .select()
     .single();

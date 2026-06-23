@@ -69,6 +69,8 @@ export const bookingSchema = z.object({
   preferred_time_start: z.string().trim().optional(),
   preferred_time_end: z.string().trim().optional(),
   photo_urls: z.array(z.string().url()).default([]),
+  service_type_id: z.string().uuid().optional().nullable(),
+  service_package_id: z.string().uuid().optional().nullable(),
 });
 
 export const tenantSchema = z.object({
