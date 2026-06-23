@@ -37,10 +37,8 @@ Maps every directive "phase" to the real file(s) that already implement it (if a
 | Notifications | `src/app/api/notifications/route.ts`, `src/lib/notifications/server.ts` (`createInAppNotification`) | Yes |
 | Provider earnings | `src/app/provider/earnings/page.tsx` | Yes — real 82% revenue-share constant, now using the shared `Table` component |
 
-## Orphaned code — do not extend, do not reference as precedent
+## Orphaned code — removed
 
-The following real files exist but have **zero import sites** anywhere in `src/app`, `src/lib`, or `src/components` (confirmed via direct grep). They should not be treated as existing capability, and new work should not be modeled on their patterns:
+A prior pass identified ~49 top-level `src/` directories (`neural-cloud`, `digital-consciousness`, `runtime-brain`, `intelligence-mesh`, `federation-governance`, `autonomous-runtime`, `simulation-cloud`, `neural-execution`, `adaptive-fabric`, `workflow-evolution`, `runtime-trust`, `runtime-cognition`, `store`, and ~37 more) accounting for roughly 394 TypeScript files with **zero import sites** anywhere in `src/app`, `src/lib`, or `src/components` (confirmed via direct grep against every directory name). They were already known dead weight — `tsconfig.json` had a 51-entry `exclude` list quarantining most of them from the type-checker, which is itself evidence no one was building on them.
 
-`src/neural-cloud/`, `src/digital-consciousness/`, `src/runtime-brain/`, `src/intelligence-mesh/`, `src/federation-governance/`, `src/autonomous-runtime/`, `src/simulation-cloud/`, `src/neural-execution/`, `src/adaptive-fabric/`, `src/workflow-evolution/`, `src/runtime-trust/`, `src/runtime-cognition/`, and roughly 50 more similarly-named top-level directories under `src/`.
-
-These collectively account for roughly 400 of the repo's ~1,093 TypeScript files. They are not part of the real, running VeloCity application. Any future phase that asks for something already named here (e.g. "Trust Mesh," "Runtime Brain," "Federation Governance") should be re-specified in terms of real product needs and built against the real files in the table above — not by resuming or extending these orphaned modules.
+These directories have now been deleted (not just excluded) from the repository, and the corresponding `tsconfig.json` exclude list was removed since there is nothing left to exclude. `tsc --noEmit`, `npm run lint`, and `npm run build` all pass clean after removal. Any future phase that asks for something matching one of these old names (e.g. "Trust Mesh," "Runtime Brain," "Federation Governance") should be re-specified in terms of real product needs and built fresh against the real files in the table above — there is no orphaned code left to resume.
