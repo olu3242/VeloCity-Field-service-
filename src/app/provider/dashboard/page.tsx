@@ -146,6 +146,7 @@ export default async function ProviderDashboard() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Provider Dashboard</h1>
           <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm"><Link href="/provider/business">Business Profile</Link></Button>
             <Button asChild variant="outline" size="sm"><Link href="/provider/earnings">Earnings</Link></Button>
             {provider.status !== "approved" && (
               <Badge variant="warning">Status: {provider.status}</Badge>

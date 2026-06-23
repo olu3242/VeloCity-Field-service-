@@ -90,6 +90,8 @@ export const providerApplicationSchema = z.object({
   years_experience: z.number().int().min(0).max(80),
 });
 
+export const providerProfileUpdateSchema = providerApplicationSchema.partial();
+
 export const providerApprovalSchema = z.object({
   provider_id: z.string().uuid(),
   action: z.enum(["approve", "reject", "suspend"]),
