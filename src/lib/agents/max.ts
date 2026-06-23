@@ -2,6 +2,10 @@
 import { BaseAgent, type AgentContext } from "./base";
 import type { Provider, Job } from "@/types";
 import { hasEnv } from "@/lib/env";
+import {
+  computeCommercialDispatchPriority,
+  type CommercialDispatchPriority,
+} from "@/lib/commercial/commercialDispatchIntelligence";
 
 export interface MatchScore {
   provider_id: string;
@@ -77,6 +81,18 @@ Rank providers and determine dispatch strategy. Respond with JSON.`;
 
     const result = await this.run<MaxOutput>(prompt, context);
     return result.success ? (result.data ?? null) : null;
+  }
+
+  /**
+   * Commercial Dispatch Intelligence Extension (Batch X+3) — for a
+   * commercial job, narrows the candidate pool to Gold/Elite-certified,
+   * under-capacity providers and computes the contract's SLA deadline.
+   * Callers should pass the resulting `eligibleProviderIds` into match()
+   * instead of the full candidate pool when `isCommercial` is true; this
+   * does not replace match()'s 5-factor ranking.
+   */
+  async assessCommercialDispatchPriority(jobId: string, candidateProviderIds: string[]): Promise<CommercialDispatchPriority> {
+    return computeCommercialDispatchPriority(jobId, candidateProviderIds);
   }
 }
 

@@ -23,6 +23,8 @@ import { AGENT_REGISTRY } from "@/lib/agents/registry";
 import type { Job, Payment, Provider, ServiceCategory } from "@/types";
 import { computeRecurringRevenueIntelligence } from "@/lib/membership/membershipRevenueIntelligence";
 import { computeMembershipRetentionIntelligence } from "@/lib/membership/membershipRetentionIntelligence";
+import { computeCommercialRevenueIntelligence } from "@/lib/commercial/commercialRevenueIntelligence";
+import { computeExecutiveIntelligence } from "@/lib/governance/executiveIntelligence";
 
 interface AgentLogRow {
   id: string;
@@ -159,6 +161,15 @@ export default async function AdminCommandCenterPage() {
   const [recurringRevenue, membershipRetention] = await Promise.all([
     computeRecurringRevenueIntelligence(),
     computeMembershipRetentionIntelligence(),
+  ]);
+
+  // Expansion Intelligence + Commercial Accounts (Batch X+3, Phase 10):
+  // delegates entirely to FINN's commercial revenue module and GABRIEL's
+  // executive briefing (which itself only reads the reports above plus
+  // market_opportunities) — no new dashboard, no new revenue engine.
+  const [commercialRevenue, executiveBriefing] = await Promise.all([
+    computeCommercialRevenueIntelligence(),
+    computeExecutiveIntelligence(),
   ]);
 
   const jobRows = (jobs ?? []) as Job[];
@@ -614,6 +625,47 @@ export default async function AdminCommandCenterPage() {
                     </div>
                   ))
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Expansion &amp; Commercial Intelligence</h2>
+          <div className="grid gap-4 md:grid-cols-5">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Commercial Revenue</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{formatCents(commercialRevenue.totalCommercialRevenueCents)} realized</div>
+                <div className="text-xs text-gray-500">{formatCents(commercialRevenue.activeContractValueCents)} active contract value</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">At-Risk Contracts</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{commercialRevenue.atRiskContracts.length} at risk</div>
+                <div className="text-xs text-gray-500">{commercialRevenue.renewalPipeline.length} renewing within 30 days</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Expansion Pipeline</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{executiveBriefing.expansionPipeline.openOpportunityCount} open opportunit(ies)</div>
+                <div className="text-xs text-gray-500">{formatCents(executiveBriefing.expansionPipeline.openOpportunityRevenueImpactCents)} expected impact</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Executive Briefing</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{formatCents(executiveBriefing.recurringRevenue.mrrCents + executiveBriefing.commercialRevenue.totalCommercialRevenueCents)} combined monthly</div>
+                <div className="text-xs text-gray-500">Renewal {executiveBriefing.recurringRevenue.renewalRate}% · Churn {executiveBriefing.recurringRevenue.churnRate}%</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Retention Risk</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{executiveBriefing.retentionRisk.atRiskMemberCount} at-risk member(s)</div>
+                <div className="text-xs text-gray-500">{executiveBriefing.retentionRisk.missedServiceCount} missed service(s)</div>
               </CardContent>
             </Card>
           </div>

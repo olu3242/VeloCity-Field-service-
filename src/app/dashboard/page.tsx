@@ -15,6 +15,8 @@ import {
 } from "@/lib/utils";
 import type { Job } from "@/types";
 import { computeCustomerMembershipSummary } from "@/lib/membership/customerMembershipSummary";
+import { computeCommercialAccountSummary } from "@/lib/commercial/commercialAccountSummary";
+import { getAdminClient } from "@/lib/supabase/admin";
 
 export default async function CustomerDashboard() {
   const supabase = await createClient();
@@ -45,6 +47,19 @@ export default async function CustomerDashboard() {
   );
 
   const memberships = await computeCustomerMembershipSummary(user.id);
+
+  // Commercial Account view (Batch X+3, Phase 11): extends this same
+  // dashboard for customers who are also the primary contact of a
+  // commercial account — no separate commercial portal.
+  const db = getAdminClient();
+  const { data: commercialAccountRow } = await db
+    .from("commercial_accounts")
+    .select("id")
+    .eq("primary_contact_id", user.id)
+    .maybeSingle();
+  const commercialAccount = commercialAccountRow
+    ? await computeCommercialAccountSummary(commercialAccountRow.id)
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -121,6 +136,52 @@ export default async function CustomerDashboard() {
                 </Card>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Commercial Account (Batch X+3, Phase 11) */}
+        {commercialAccount && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">My Commercial Account</h2>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium">{commercialAccount.name}</div>
+                  <Badge className={commercialAccount.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}>
+                    {commercialAccount.status}
+                  </Badge>
+                </div>
+                <div className="text-sm text-gray-500 mb-3">
+                  {commercialAccount.locationCount} location(s) · {commercialAccount.jobCount} job(s) · {formatCents(commercialAccount.realizedRevenueCents)} realized
+                </div>
+                <div className="space-y-3">
+                  {commercialAccount.activeContracts.map((contract) => (
+                    <div key={contract.contractId} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium capitalize">{contract.contractType.replace(/_/g, " ")} contract</span>
+                        <Badge className={contract.status === "active" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}>
+                          {contract.status}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatCents(contract.contractValueCents)} ({contract.billingFrequency}) · renews {contract.endDate ?? "ongoing"}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {contract.servicePlans.map((plan, i) => (
+                          <div key={i} className="text-xs text-gray-500 flex items-center justify-between">
+                            <span>{plan.serviceTypeName}</span>
+                            <span>{plan.includedUsesPerPeriod === null ? "unlimited" : `${plan.includedUsesPerPeriod}/${plan.period}`}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {!commercialAccount.activeContracts.length && (
+                    <p className="text-sm text-gray-500">No active contracts.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 

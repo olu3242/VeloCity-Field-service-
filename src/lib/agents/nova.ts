@@ -6,6 +6,18 @@ import {
   computeMembershipGrowthIntelligence,
   type MembershipGrowthReport,
 } from "@/lib/membership/membershipGrowthIntelligence";
+import {
+  computeMarketDemand,
+  type MarketDemandCategoryReport,
+} from "@/lib/expansion/marketDemandIntelligence";
+import {
+  computeMarketSupply,
+  type MarketSupplyCategoryReport,
+} from "@/lib/expansion/marketSupplyIntelligence";
+import {
+  computeMarketOpportunities,
+  type MarketOpportunityReport,
+} from "@/lib/expansion/marketOpportunityIntelligence";
 
 export interface NovaTransitionOutput {
   allowed: boolean;
@@ -129,6 +141,34 @@ What reminders should be sent and when? Respond with JSON.`;
    */
   async recommendMembershipGrowth(customerId: string): Promise<MembershipGrowthReport> {
     return computeMembershipGrowthIntelligence(customerId);
+  }
+
+  /**
+   * Demand Intelligence (Batch X+3) — per-category job demand for a
+   * franchise territory, read-time from real `jobs` rows. Persists a
+   * market_demand snapshot as a side effect.
+   */
+  async assessMarketDemand(territoryId: string): Promise<MarketDemandCategoryReport[]> {
+    return computeMarketDemand(territoryId);
+  }
+
+  /**
+   * Supply Intelligence (Batch X+3) — per-category active provider supply
+   * for a franchise territory, read-time from real `providers`/
+   * `service_areas` rows. Persists a market_supply snapshot as a side effect.
+   */
+  async assessMarketSupply(territoryId: string): Promise<MarketSupplyCategoryReport[]> {
+    return computeMarketSupply(territoryId);
+  }
+
+  /**
+   * Expansion opportunities for a franchise territory — combines demand and
+   * supply intelligence with the existing territoryOpportunityScore/
+   * supplyGapAnalysis pure functions, with expected revenue impact.
+   * Persists market_metrics/market_opportunities as a side effect.
+   */
+  async recommendExpansionOpportunities(territoryId: string): Promise<MarketOpportunityReport> {
+    return computeMarketOpportunities(territoryId);
   }
 }
 

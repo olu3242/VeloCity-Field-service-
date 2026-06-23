@@ -7,6 +7,10 @@ import {
   computeRecurringRevenueIntelligence,
   type RecurringRevenueReport,
 } from "@/lib/membership/membershipRevenueIntelligence";
+import {
+  computeCommercialRevenueIntelligence,
+  type CommercialRevenueReport,
+} from "@/lib/commercial/commercialRevenueIntelligence";
 
 export interface FinnPayoutOutput {
   should_release: boolean;
@@ -130,6 +134,16 @@ Identify anomalies and provide reconciliation report. Respond with JSON.`;
    */
   async calculateRecurringRevenue(): Promise<RecurringRevenueReport> {
     return computeRecurringRevenueIntelligence();
+  }
+
+  /**
+   * Commercial revenue/contract attainment/renewal pipeline, read-time from
+   * revenue_records (filtered by commercial_account_id) and
+   * commercial_contracts. No second revenue ledger — delegates entirely to
+   * commercialRevenueIntelligence.ts.
+   */
+  async calculateCommercialRevenue(): Promise<CommercialRevenueReport> {
+    return computeCommercialRevenueIntelligence();
   }
 }
 
