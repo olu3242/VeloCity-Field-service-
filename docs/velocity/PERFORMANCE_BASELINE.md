@@ -1,6 +1,12 @@
-# Performance Baseline (Batch X, Phase 8)
+# Performance Baseline (Batch X, Phase 8 — refreshed under Platform Certification & Launch Readiness Batch, Phase 8)
 
 **No live database connection or query planner is available in this environment** (consistent with every prior disclosure in this engagement — see `SERVICE_CATALOG_E2E_VALIDATION.md`). This baseline is therefore a static code-level review identifying patterns that would cause slow queries or bottlenecks, not live `EXPLAIN ANALYZE` output or measured latency numbers. Treat the findings below as a punch list for a live staging pass, not as measured facts.
+
+## Update (Platform Certification batch)
+
+Re-verified against current `src/app/admin/command-center/page.tsx`: the page now also computes Membership/Recurring Revenue Intelligence and Expansion/Commercial Intelligence (Batches X+2/X+3) via `Promise.all`-parallelized calls into `computeRecurringRevenueIntelligence()`, `computeCommercialRevenueIntelligence()`, `computeExecutiveIntelligence()` — each of these performs its own internal Supabase queries (not visible as part of the page's top-level query count), so the page's actual query count is higher than the 16 queries described below. This is additive load from each new batch's read-time computation pattern, not a new architecture, and has the same caching gap (no caching layer; every page load recomputes everything). No new bottleneck class was introduced — same pattern (parallel, capped, uncached) as the rest of the page.
+
+Automation latency is also instrumented end-to-end: `automation_runs.started_at`/`completed_at` (per Phase 4's `AUTOMATION_FABRIC_CERTIFICATION.md`) gives queue-pickup-to-completion time once live events exist, complementing the agent `latency_ms` instrumentation already noted below. Both are real, queryable instrumentation with zero data in this environment — see `E2E_JOURNEY_CERTIFICATION.md`'s "What was not validated" section for the full disclosure on booking/dispatch/dashboard latency.
 
 ## Database
 
