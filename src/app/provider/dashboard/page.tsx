@@ -23,6 +23,9 @@ import {
 } from "@/lib/scoring";
 import { recommendProviderPlan, forecastRevenue } from "@/lib/revenue";
 import { analyzeSupplyGap } from "@/lib/expansion";
+import { lena } from "@/lib/agents/lena";
+import { quinn } from "@/lib/agents/quinn";
+import { computeProviderGrowthIntelligence } from "@/lib/growth/providerGrowthIntelligence";
 
 export default async function ProviderDashboard() {
   const supabase = await createClient();
@@ -126,6 +129,27 @@ export default async function ProviderDashboard() {
     activeProviders: Math.max(activePeerCount ?? 1, 1),
   });
 
+  // Provider Excellence (Batch X+1, Phase 10): skills/certifications read
+  // directly from the evidence tables computed by computeProviderSkill()/
+  // evaluateProviderCertification() on every job completion; learning,
+  // revenue, expansion, and quality recommendations are computed live by
+  // LENA/QUINN/the growth intelligence module — nothing here is hardcoded.
+  const [{ data: providerSkills }, { data: providerCertifications }, growthPath, qualityReport, growthIntelligence] =
+    await Promise.all([
+      supabase
+        .from("provider_skills")
+        .select("service_type_id, skill_tier, proficiency_score, completed_jobs_count, average_rating, service_types(name)")
+        .eq("provider_id", provider.id),
+      supabase
+        .from("provider_certifications")
+        .select("category, tier, is_active, awarded_at")
+        .eq("provider_id", provider.id)
+        .eq("is_active", true),
+      lena.recommendGrowthPath(provider.id),
+      quinn.assessQuality(provider.id),
+      computeProviderGrowthIntelligence(provider.id),
+    ]);
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <nav className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
@@ -216,6 +240,96 @@ export default async function ProviderDashboard() {
               <CardContent>
                 <Badge>{planRecommendation.plan}</Badge>
                 <p className="mt-2 text-sm text-gray-500">{planRecommendation.reason}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Provider Excellence */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">Provider Excellence</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Skills</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!providerSkills?.length ? (
+                  <p className="text-sm text-gray-500">Complete jobs to build your skills graph.</p>
+                ) : (
+                  providerSkills.map((skill: any) => (
+                    <div key={skill.service_type_id} className="flex items-center justify-between text-sm">
+                      <span>{skill.service_types?.name ?? "Service"}</span>
+                      <Badge variant="secondary">{skill.skill_tier} · {skill.completed_jobs_count} jobs</Badge>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Certifications</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!providerCertifications?.length ? (
+                  <p className="text-sm text-gray-500">No active certifications yet — keep completing jobs to qualify.</p>
+                ) : (
+                  providerCertifications.map((cert: any) => (
+                    <div key={cert.category} className="flex items-center justify-between text-sm">
+                      <span>{SERVICE_CATEGORY_LABELS[cert.category as keyof typeof SERVICE_CATEGORY_LABELS] ?? cert.category}</span>
+                      <Badge>{cert.tier}</Badge>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Learning Recommendations</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!growthPath.learning_path.length ? (
+                  <p className="text-sm text-gray-500">No tier gaps detected.</p>
+                ) : (
+                  growthPath.learning_path.map((item) => (
+                    <p key={item.service_type_id} className="text-sm text-gray-500">
+                      <span className="font-medium text-gray-300">{item.service_type_name}:</span> {item.gap_summary}
+                    </p>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Quality Improvement</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!qualityReport.riskAlerts.length ? (
+                  <p className="text-sm text-gray-500">No quality risk alerts.</p>
+                ) : (
+                  qualityReport.riskAlerts.map((alert, idx) => (
+                    <p key={idx} className="text-sm text-gray-500">{alert.reason}</p>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Revenue Recommendations</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!growthIntelligence.pricingOpportunities.length ? (
+                  <p className="text-sm text-gray-500">No pricing variance detected against the platform average.</p>
+                ) : (
+                  growthIntelligence.pricingOpportunities.map((op) => (
+                    <p key={op.category} className="text-sm text-gray-500">{op.reason}</p>
+                  ))
+                )}
+                <p className="text-sm font-medium text-green-700">
+                  Expected revenue impact: {formatCents(growthIntelligence.expectedRevenueImpactCents)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Service Expansion Opportunities</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!growthIntelligence.serviceExpansionOpportunities.length ? (
+                  <p className="text-sm text-gray-500">No unserved demand detected in your area.</p>
+                ) : (
+                  growthIntelligence.serviceExpansionOpportunities.map((op) => (
+                    <p key={op.category} className="text-sm text-gray-500">{op.reason}</p>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
