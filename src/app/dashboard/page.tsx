@@ -14,6 +14,7 @@ import {
   formatDateTime,
 } from "@/lib/utils";
 import type { Job } from "@/types";
+import { computeCustomerMembershipSummary } from "@/lib/membership/customerMembershipSummary";
 
 export default async function CustomerDashboard() {
   const supabase = await createClient();
@@ -42,6 +43,8 @@ export default async function CustomerDashboard() {
   const activeJobs = jobs?.filter((j) =>
     !["completed", "closed", "cancelled", "expired", "refunded"].includes(j.status)
   );
+
+  const memberships = await computeCustomerMembershipSummary(user.id);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -77,6 +80,49 @@ export default async function CustomerDashboard() {
             )}
           />
         </div>
+
+        {/* Memberships (Batch X+2, Phase 11) */}
+        {memberships.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">My Memberships</h2>
+            <div className="space-y-3">
+              {memberships.map((m) => (
+                <Card key={m.subscriptionId}>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-medium">{m.planName}</div>
+                      <Badge className={m.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}>
+                        {m.status}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-gray-500 mb-3">
+                      {m.billingFrequency} billing • renews {formatDateTime(m.currentPeriodEnd)}
+                      {m.nextServiceDate ? ` • next service ${m.nextServiceDate}` : ""}
+                    </div>
+                    <div className="space-y-1 mb-3">
+                      {m.entitlements.map((e) => (
+                        <div key={e.entitlementId} className="text-xs text-gray-500 flex items-center justify-between">
+                          <span>
+                            {e.serviceTypeName}
+                            {e.isPriorityScheduling ? " (priority scheduling)" : ""}
+                          </span>
+                          <span>
+                            {e.includedUsesPerPeriod === null
+                              ? `${e.usedThisPeriod} used (unlimited)`
+                              : `${e.usedThisPeriod}/${e.includedUsesPerPeriod} used`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-sm font-medium text-velocity-700">
+                      Savings realized this period: {formatCents(m.savingsRealizedCents)}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Active Jobs */}
         {activeJobs && activeJobs.length > 0 && (

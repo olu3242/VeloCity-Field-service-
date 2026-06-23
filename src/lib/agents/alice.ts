@@ -2,6 +2,10 @@
 import { BaseAgent, type AgentContext } from "./base";
 import type { AIClassification, ServiceCategory, UrgencyLevel } from "@/types";
 import { hasEnv } from "@/lib/env";
+import {
+  computeMembershipRetentionIntelligence,
+  type MembershipRetentionReport,
+} from "@/lib/membership/membershipRetentionIntelligence";
 
 export interface AliceOutput {
   category: ServiceCategory;
@@ -63,6 +67,16 @@ Classify this request and respond with JSON.`;
 
     const result = await this.run<AliceOutput>(prompt, context);
     return result.success ? (result.data ?? null) : null;
+  }
+
+  /**
+   * Membership retention intelligence — upcoming renewals, missed
+   * services, inactive members, at-risk members, and the retention
+   * workflows they trigger. Read-time only, delegates entirely to
+   * membershipRetentionIntelligence.ts (no new retention engine).
+   */
+  async assessMembershipRetention(): Promise<MembershipRetentionReport> {
+    return computeMembershipRetentionIntelligence();
   }
 }
 

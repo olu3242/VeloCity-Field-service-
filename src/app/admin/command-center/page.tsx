@@ -21,6 +21,8 @@ import { analyzeSupplyGap } from "@/lib/expansion";
 import { getTenantId } from "@/lib/tenancy";
 import { AGENT_REGISTRY } from "@/lib/agents/registry";
 import type { Job, Payment, Provider, ServiceCategory } from "@/types";
+import { computeRecurringRevenueIntelligence } from "@/lib/membership/membershipRevenueIntelligence";
+import { computeMembershipRetentionIntelligence } from "@/lib/membership/membershipRetentionIntelligence";
 
 interface AgentLogRow {
   id: string;
@@ -148,6 +150,15 @@ export default async function AdminCommandCenterPage() {
     supabase.from("audit_logs").select("id,action,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(200),
     supabase.from("provider_skills").select("skill_tier,proficiency_score").eq("tenant_id", tenantId).limit(2000),
     supabase.from("provider_certifications").select("category,tier,is_active").eq("tenant_id", tenantId).eq("is_active", true).limit(1000),
+  ]);
+
+  // Membership Revenue + Retention Intelligence (Batch X+2, Phase 10):
+  // delegates entirely to FINN's/ALICE's membership intelligence modules —
+  // no new revenue or retention engine, same read-time pattern as Provider
+  // Excellence Intelligence above.
+  const [recurringRevenue, membershipRetention] = await Promise.all([
+    computeRecurringRevenueIntelligence(),
+    computeMembershipRetentionIntelligence(),
   ]);
 
   const jobRows = (jobs ?? []) as Job[];
@@ -555,6 +566,54 @@ export default async function AdminCommandCenterPage() {
               <CardContent className="space-y-1 text-sm">
                 <div>{growthIntelligence.openSupplyGapCategories} open supply-gap categor(ies)</div>
                 <div className="text-xs text-gray-500">{growthIntelligence.categoriesNeedingCommercialCertification} categor(ies) need commercial certification growth</div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Membership &amp; Recurring Revenue Intelligence</h2>
+          <div className="grid gap-4 md:grid-cols-5">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">MRR / ARR</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{formatCents(recurringRevenue.mrrCents)} MRR</div>
+                <div className="text-xs text-gray-500">{formatCents(recurringRevenue.arrCents)} ARR</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Renewal / Churn</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{recurringRevenue.renewalRate}% renewal rate</div>
+                <div className="text-xs text-gray-500">{recurringRevenue.churnRate}% churn rate (90d)</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Expansion Revenue</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{formatCents(recurringRevenue.expansionRevenueCents)}</div>
+                <div className="text-xs text-gray-500">Forecasted next period: {formatCents(recurringRevenue.forecastedNextPeriodRevenueCents)}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Retention Workflows</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{membershipRetention.upcomingRenewals.length} upcoming renewal(s)</div>
+                <div className="text-xs text-gray-500">{membershipRetention.atRiskMembers.length} at-risk member(s) · {membershipRetention.inactiveMembers.length} inactive</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Plan Profitability</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                {!recurringRevenue.planProfitability.length ? (
+                  <div className="text-xs text-gray-500">No active membership plans yet.</div>
+                ) : (
+                  recurringRevenue.planProfitability.slice(0, 3).map((plan) => (
+                    <div key={plan.planId} className="text-xs text-gray-500">
+                      {plan.planName}: {formatCents(plan.profitabilityCents)} ({plan.activeSubscriptions} active)
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>

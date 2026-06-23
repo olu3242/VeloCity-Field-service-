@@ -3,6 +3,10 @@ import { BaseAgent, type AgentContext } from "./base";
 import { generateQuoteIntelligence, type QuoteIntelligenceResult } from "@/lib/pricing/quoteIntelligence";
 import type { PricingInput } from "@/lib/pricing/types";
 import type { Payment, Job } from "@/types";
+import {
+  computeRecurringRevenueIntelligence,
+  type RecurringRevenueReport,
+} from "@/lib/membership/membershipRevenueIntelligence";
 
 export interface FinnPayoutOutput {
   should_release: boolean;
@@ -116,6 +120,16 @@ Identify anomalies and provide reconciliation report. Respond with JSON.`;
    */
   estimateJobEconomics(input: PricingInput): QuoteIntelligenceResult {
     return generateQuoteIntelligence(input);
+  }
+
+  /**
+   * MRR/ARR/renewal-rate/churn-rate/expansion-revenue/membership
+   * profitability/forecast, read-time from membership_subscriptions,
+   * membership_events, and revenue_records. No new revenue engine — this
+   * delegates entirely to membershipRevenueIntelligence.ts.
+   */
+  async calculateRecurringRevenue(): Promise<RecurringRevenueReport> {
+    return computeRecurringRevenueIntelligence();
   }
 }
 

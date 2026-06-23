@@ -26,6 +26,7 @@ import { analyzeSupplyGap } from "@/lib/expansion";
 import { lena } from "@/lib/agents/lena";
 import { quinn } from "@/lib/agents/quinn";
 import { computeProviderGrowthIntelligence } from "@/lib/growth/providerGrowthIntelligence";
+import { computeProviderMembershipWork } from "@/lib/membership/providerMembershipWork";
 
 export default async function ProviderDashboard() {
   const supabase = await createClient();
@@ -134,7 +135,7 @@ export default async function ProviderDashboard() {
   // evaluateProviderCertification() on every job completion; learning,
   // revenue, expansion, and quality recommendations are computed live by
   // LENA/QUINN/the growth intelligence module — nothing here is hardcoded.
-  const [{ data: providerSkills }, { data: providerCertifications }, growthPath, qualityReport, growthIntelligence] =
+  const [{ data: providerSkills }, { data: providerCertifications }, growthPath, qualityReport, growthIntelligence, membershipWork] =
     await Promise.all([
       supabase
         .from("provider_skills")
@@ -148,6 +149,7 @@ export default async function ProviderDashboard() {
       lena.recommendGrowthPath(provider.id),
       quinn.assessQuality(provider.id),
       computeProviderGrowthIntelligence(provider.id),
+      computeProviderMembershipWork(provider.id),
     ]);
 
   return (
@@ -328,6 +330,43 @@ export default async function ProviderDashboard() {
                 ) : (
                   growthIntelligence.serviceExpansionOpportunities.map((op) => (
                     <p key={op.category} className="text-sm text-gray-500">{op.reason}</p>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Membership Work (Batch X+2, Phase 9) */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">Membership Work</h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Recurring Customers</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold">{membershipWork.recurringCustomerCount}</p>
+                <p className="text-sm text-gray-500">Active membership customers with upcoming work assigned to you</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Projected Membership Revenue</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold">{formatCents(membershipWork.projectedMembershipRevenueCents)}</p>
+                <p className="text-sm text-gray-500">Your payout share from completed membership-driven jobs</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Upcoming Membership Jobs</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!membershipWork.upcomingMembershipJobs.length ? (
+                  <p className="text-sm text-gray-500">No upcoming membership-driven jobs.</p>
+                ) : (
+                  membershipWork.upcomingMembershipJobs.slice(0, 5).map((job) => (
+                    <p key={job.jobId} className="text-sm text-gray-500">
+                      <span className="font-medium text-gray-300">{job.planName}:</span>{" "}
+                      {SERVICE_CATEGORY_LABELS[job.category as keyof typeof SERVICE_CATEGORY_LABELS] ?? job.category}
+                      {job.scheduledStart ? ` — ${formatDateTime(job.scheduledStart)}` : ""}
+                    </p>
                   ))
                 )}
               </CardContent>

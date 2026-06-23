@@ -29,7 +29,14 @@ export type AutomationEventType =
   | "retention_campaign"
   | "provider_scoring"
   | "tip_submitted"
-  | "agent_run";
+  | "agent_run"
+  | "subscription_due"
+  | "warranty_callback_due"
+  | "membership_created"
+  | "membership_renewed"
+  | "membership_expiring"
+  | "membership_cancelled"
+  | "renewal_failed";
 
 export type QueueStatus = "pending" | "processing" | "completed" | "failed" | "skipped";
 export type RunStatus   = "running"  | "completed" | "failed"  | "skipped";

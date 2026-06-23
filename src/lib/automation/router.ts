@@ -22,6 +22,7 @@ import { handlePayoutRelease } from "./handlers/payout-release";
 import { handleProviderOffer } from "./handlers/provider-offer";
 import { handleSLACheck } from "./handlers/sla-check";
 import { handleTipSubmitted } from "./handlers/tip-submitted";
+import { handleMembershipLifecycle } from "./handlers/membership-lifecycle";
 
 // ── Build a synthetic queue item for handlers that need one ──────────────
 function syntheticQueueItem(eventType: AutomationEventType, payload: AutomationPayload): AutomationQueueItem {
@@ -220,6 +221,18 @@ export async function routeAutomationEvent(
         }
         const result = await handleTessTerritory(typedPayload, queueItem);
         output.tess = result;
+        break;
+      }
+
+      // ── Membership Lifecycle: ALICE retention + FINN revenue + NOVA growth ──
+      case "membership_created":
+      case "membership_renewed":
+      case "membership_expiring":
+      case "membership_cancelled":
+      case "renewal_failed": {
+        actions.push("membership-lifecycle");
+        const result = await handleMembershipLifecycle(typedPayload, queueItem);
+        output.membership = result;
         break;
       }
 

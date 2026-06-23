@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { processAutomationQueue } from "@/lib/automation/worker";
+import { emitDueMembershipServices, emitExpiringMemberships } from "@/lib/membership/membershipLifecycle";
 
 export async function GET(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret") ?? request.nextUrl.searchParams.get("secret");
@@ -22,12 +23,22 @@ export async function GET(request: NextRequest) {
       emitEvent("retention_campaign",        { date: today, trigger: "daily" }, `retention_daily:${today}`),
     ]);
 
+    // Membership lifecycle: activates the previously-dead subscription_due
+    // event for memberships whose next_service_date has arrived, and emits
+    // membership_expiring for renewals within 7 days (Batch X+2, Phase 8).
+    const [dueServices, expiringMemberships] = await Promise.all([
+      emitDueMembershipServices(),
+      emitExpiringMemberships(),
+    ]);
+
     // Process immediately
     const workerResult = await processAutomationQueue();
 
     return NextResponse.json({
       data: {
         jobs_emitted: ["daily_territory_analysis", "provider_scoring", "retention_campaign"],
+        membership_service_due_emitted: dueServices,
+        membership_expiring_emitted: expiringMemberships,
         queue: workerResult,
         ran_at: new Date().toISOString(),
       },

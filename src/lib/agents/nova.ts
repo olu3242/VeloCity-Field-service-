@@ -2,6 +2,10 @@
 import { BaseAgent, type AgentContext } from "./base";
 import type { Job, JobStatus } from "@/types";
 import { hasEnv } from "@/lib/env";
+import {
+  computeMembershipGrowthIntelligence,
+  type MembershipGrowthReport,
+} from "@/lib/membership/membershipGrowthIntelligence";
 
 export interface NovaTransitionOutput {
   allowed: boolean;
@@ -115,6 +119,16 @@ What reminders should be sent and when? Respond with JSON.`;
 
     const result = await this.run<NovaReminderOutput>(prompt, context);
     return result.success ? (result.data ?? null) : null;
+  }
+
+  /**
+   * Cross-sell/upsell/plan-upgrade/expansion membership opportunities for a
+   * customer, read-time from real job history, membership_usage, and
+   * membership_plan_pricing. No new growth engine — delegates entirely to
+   * membershipGrowthIntelligence.ts.
+   */
+  async recommendMembershipGrowth(customerId: string): Promise<MembershipGrowthReport> {
+    return computeMembershipGrowthIntelligence(customerId);
   }
 }
 
