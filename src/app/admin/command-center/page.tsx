@@ -127,6 +127,8 @@ export default async function AdminCommandCenterPage() {
     { data: profiles },
     { data: serviceTypes },
     { data: auditLogs },
+    { data: providerSkills },
+    { data: providerCertifications },
   ] = await Promise.all([
     supabase.from("jobs").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(500),
     supabase.from("providers").select("*").eq("tenant_id", tenantId).limit(500),
@@ -144,6 +146,8 @@ export default async function AdminCommandCenterPage() {
     supabase.from("profiles").select("id,role,created_at").eq("tenant_id", tenantId).limit(200),
     supabase.from("service_types").select("id,name,category").eq("tenant_id", tenantId).eq("is_active", true).limit(200),
     supabase.from("audit_logs").select("id,action,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("provider_skills").select("skill_tier,proficiency_score").eq("tenant_id", tenantId).limit(2000),
+    supabase.from("provider_certifications").select("category,tier,is_active").eq("tenant_id", tenantId).eq("is_active", true).limit(1000),
   ]);
 
   const jobRows = (jobs ?? []) as Job[];
@@ -324,6 +328,73 @@ export default async function AdminCommandCenterPage() {
     accessAuditVolume: accessAudits?.length ?? 0,
   };
 
+  // Provider Excellence Intelligence (Batch X+1, Phase 9): reuses the
+  // existing parallel query set plus the two new provider_skills/
+  // provider_certifications queries above — no new dashboard, computed
+  // entirely from real evidence rows written by computeProviderSkill()/
+  // evaluateProviderCertification() (rex-completion.ts) and the existing
+  // pricing_decisions/jobs/providers result sets already loaded.
+  const skillRows = providerSkills ?? [];
+  const skillTierCounts = skillRows.reduce(
+    (acc: Record<string, number>, row: { skill_tier: string }) => {
+      acc[row.skill_tier] = (acc[row.skill_tier] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+  const skillsIntelligence = {
+    totalSkillRows: skillRows.length,
+    tierCounts: skillTierCounts,
+    avgProficiencyScore: skillRows.length
+      ? Math.round(
+          (skillRows.reduce((sum: number, row: { proficiency_score: number }) => sum + row.proficiency_score, 0) /
+            skillRows.length) *
+            100
+        ) / 100
+      : null,
+  };
+
+  const certRows = providerCertifications ?? [];
+  const certTierCounts = certRows.reduce(
+    (acc: Record<string, number>, row: { tier: string }) => {
+      acc[row.tier] = (acc[row.tier] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+  const categoriesWithGoldOrElite = new Set(
+    certRows
+      .filter((row: { tier: string }) => row.tier === "gold" || row.tier === "elite")
+      .map((row: { category: string }) => row.category)
+  );
+  const allCategories = new Set(serviceTypeRows.map((st) => st.category));
+  const categoriesWithoutCommercialCoverage = Array.from(allCategories).filter(
+    (category) => !categoriesWithGoldOrElite.has(category)
+  );
+  const certificationIntelligence = {
+    activeCertCount: certRows.length,
+    tierCounts: certTierCounts,
+    categoriesWithoutCommercialCoverage,
+  };
+
+  const trustScores = providerRows.map((p) => p.trust_score ?? 0).filter((n) => Number.isFinite(n));
+  const qualityIntelligence = {
+    avgTrustScore: trustScores.length ? Math.round((trustScores.reduce((s, n) => s + n, 0) / trustScores.length) * 100) / 100 : null,
+    providersAtRisk: providerRows.filter((p) => (p.trust_score ?? 0) < 0.6).length,
+  };
+
+  const quoteIntelligence = {
+    avgConfidenceScore: pricingRows.length
+      ? Math.round(pricingRows.reduce((sum, d) => sum + Number(d.confidence_score ?? 0), 0) / pricingRows.length)
+      : null,
+    flaggedQuotes: pricingFlags.length,
+  };
+
+  const growthIntelligence = {
+    openSupplyGapCategories: supplyGaps.length,
+    categoriesNeedingCommercialCertification: categoriesWithoutCommercialCoverage.length,
+  };
+
   const ops = calculateOpsHealthScore(metrics);
   const revenue = calculateRevenueHealthScore(metrics);
   const automation = calculateAutomationHealthScore(metrics);
@@ -441,6 +512,49 @@ export default async function AdminCommandCenterPage() {
               <CardContent className="space-y-1 text-sm">
                 <div>Agent logs: {evidenceHealth.agentLogVolume}</div>
                 <div className="text-xs text-gray-500">Audit logs: {evidenceHealth.auditLogVolume} · Access audits: {evidenceHealth.accessAuditVolume}</div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Provider Excellence Intelligence</h2>
+          <div className="grid gap-4 md:grid-cols-5">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Skills Intelligence</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{skillsIntelligence.totalSkillRows} computed skill rows</div>
+                <div className="text-xs text-gray-500">Avg proficiency: {skillsIntelligence.avgProficiencyScore ?? "—"}</div>
+                <div className="text-xs text-gray-500">Expert: {skillsIntelligence.tierCounts.expert ?? 0} · Proficient: {skillsIntelligence.tierCounts.proficient ?? 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Certification Intelligence</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{certificationIntelligence.activeCertCount} active certifications</div>
+                <div className="text-xs text-gray-500">Gold: {certificationIntelligence.tierCounts.gold ?? 0} · Elite: {certificationIntelligence.tierCounts.elite ?? 0}</div>
+                <div className="text-xs text-gray-500">{certificationIntelligence.categoriesWithoutCommercialCoverage.length} category(ies) without commercial-tier coverage</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Quality Intelligence</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>Avg trust score: {qualityIntelligence.avgTrustScore ?? "—"}</div>
+                <div className="text-xs text-gray-500">{qualityIntelligence.providersAtRisk} provider(s) below 0.60 trust score</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Quote Intelligence</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>Avg quote confidence: {quoteIntelligence.avgConfidenceScore ?? "—"}</div>
+                <div className="text-xs text-gray-500">{quoteIntelligence.flaggedQuotes} flagged quote(s)</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Provider Growth Intelligence</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{growthIntelligence.openSupplyGapCategories} open supply-gap categor(ies)</div>
+                <div className="text-xs text-gray-500">{growthIntelligence.categoriesNeedingCommercialCertification} categor(ies) need commercial certification growth</div>
               </CardContent>
             </Card>
           </div>
