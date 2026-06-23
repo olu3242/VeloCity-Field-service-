@@ -1,6 +1,30 @@
 // LENA — Customer Retention & Rebooking Agent
 import { BaseAgent, type AgentContext } from "./base";
+import { getAdminClient } from "@/lib/supabase/admin";
 import type { Job, ServiceCategory } from "@/types";
+
+export interface LenaGrowthPathOutput {
+  provider_id: string;
+  learning_path: Array<{
+    service_type_id: string;
+    service_type_name: string;
+    current_tier: string;
+    next_tier: string | null;
+    gap_summary: string;
+  }>;
+  certification_path: Array<{
+    category: string;
+    current_tier: string | null;
+    next_tier: string;
+    jobs_gap: number;
+    rating_gap: number;
+  }>;
+  service_expansion_path: Array<{
+    category: string;
+    demand_jobs_last_90_days: number;
+    reason: string;
+  }>;
+}
 
 export interface LenaRebookOutput {
   should_offer_rebook: boolean;
@@ -106,6 +130,105 @@ Is this customer at risk of churning? What retention action should we take? Resp
 
     const result = await this.run<LenaRetentionOutput>(prompt, context);
     return result.success ? (result.data ?? null) : null;
+  }
+
+  /**
+   * Deterministic growth-path recommendation, computed entirely from
+   * provider_skills/provider_skill_progress, provider_certifications/
+   * provider_certification_requirements, and real platform demand
+   * (jobs in the last 90 days). No LLM call — every entry is traceable
+   * to a row in those tables, per Rule 2 (no synthetic recommendations).
+   */
+  async recommendGrowthPath(providerId: string): Promise<LenaGrowthPathOutput> {
+    const db = getAdminClient();
+
+    const [{ data: progressRows }, { data: provider }, { data: certifications }] = await Promise.all([
+      db
+        .from("provider_skill_progress")
+        .select("service_type_id, current_tier, next_tier, gap_summary, service_types(name)")
+        .eq("provider_id", providerId),
+      db.from("providers").select("categories").eq("id", providerId).single(),
+      db.from("provider_certifications").select("category, tier, is_active").eq("provider_id", providerId),
+    ]);
+
+    const learning_path = (progressRows ?? [])
+      .filter((row: { next_tier: string | null }) => row.next_tier !== null)
+      .map((row: any) => ({
+        service_type_id: row.service_type_id,
+        service_type_name: row.service_types?.name ?? "Unknown",
+        current_tier: row.current_tier,
+        next_tier: row.next_tier,
+        gap_summary: row.gap_summary ?? "",
+      }));
+
+    const providerCategories: string[] = provider?.categories ?? [];
+    const certification_path: LenaGrowthPathOutput["certification_path"] = [];
+
+    for (const category of providerCategories) {
+      const activeCert = certifications?.find(
+        (c: { category: string; is_active: boolean }) => c.category === category && c.is_active
+      );
+      const currentTier: string | null = activeCert?.tier ?? null;
+      const tierOrder = ["bronze", "silver", "gold", "elite"];
+      const nextTierIdx = currentTier ? tierOrder.indexOf(currentTier) + 1 : 0;
+      const nextTier = tierOrder[nextTierIdx];
+      if (!nextTier) continue;
+
+      const { data: req } = await db
+        .from("provider_certification_requirements")
+        .select("min_completed_jobs, min_average_rating")
+        .eq("category", category)
+        .eq("tier", nextTier)
+        .maybeSingle();
+      if (!req) continue;
+
+      const { data: jobs } = await db
+        .from("jobs")
+        .select("id")
+        .eq("provider_id", providerId)
+        .eq("category", category)
+        .in("status", ["completed", "customer_confirmed"]);
+      const completedJobsCount = jobs?.length ?? 0;
+
+      certification_path.push({
+        category,
+        current_tier: currentTier,
+        next_tier: nextTier,
+        jobs_gap: Math.max(req.min_completed_jobs - completedJobsCount, 0),
+        rating_gap: req.min_average_rating,
+      });
+    }
+
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: openCategoryJobs } = await db
+      .from("jobs")
+      .select("category")
+      .gte("created_at", ninetyDaysAgo);
+
+    const demandByCategory = new Map<string, number>();
+    for (const row of openCategoryJobs ?? []) {
+      demandByCategory.set(row.category, (demandByCategory.get(row.category) ?? 0) + 1);
+    }
+
+    const service_expansion_path: LenaGrowthPathOutput["service_expansion_path"] = [];
+    for (const [category, count] of Array.from(demandByCategory.entries())) {
+      if (providerCategories.includes(category)) continue;
+      if (count > 0) {
+        service_expansion_path.push({
+          category,
+          demand_jobs_last_90_days: count,
+          reason: `${count} job(s) requested in this category over the last 90 days that this provider is not yet eligible for`,
+        });
+      }
+    }
+    service_expansion_path.sort((a, b) => b.demand_jobs_last_90_days - a.demand_jobs_last_90_days);
+
+    return {
+      provider_id: providerId,
+      learning_path,
+      certification_path,
+      service_expansion_path,
+    };
   }
 }
 

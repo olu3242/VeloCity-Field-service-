@@ -3,6 +3,7 @@ import { BaseAgent, type AgentContext } from "./base";
 import type { AgentResponse } from "@/types";
 import type { QuoteLineItem, ServiceCategory, UrgencyLevel } from "@/types";
 import { hasEnv } from "@/lib/env";
+import { assessProviderQuality, type ProviderQualityReport } from "@/lib/quality/providerQuality";
 
 export interface QuinnOutput {
   is_fair: boolean;
@@ -111,6 +112,15 @@ Respond with JSON containing line_items (array), subtotal_cents, tax_cents, tota
 
     const result = await this.run<QuinnEstimateOutput>(prompt, context);
     return result.success ? (result.data ?? null) : null;
+  }
+
+  /**
+   * Deterministic Provider/Service Quality Score, repeat-issue detection,
+   * sentiment trend, and risk alerts — computed entirely from real
+   * reviews/jobs/disputes/provider_skills evidence (Rule 2). No LLM call.
+   */
+  async assessQuality(providerId: string): Promise<ProviderQualityReport> {
+    return assessProviderQuality(providerId);
   }
 }
 

@@ -43,6 +43,36 @@ export async function getAvailableProviders(input: {
     );
   }
 
+  // Provider Eligibility Engine: commercial-tier jobs require an active
+  // Gold/Elite certification in this job's category (computed by
+  // evaluateProviderCertification from real job/rating/trust evidence —
+  // never manually assigned). Non-commercial jobs are unaffected; providers
+  // with no certification row at all remain eligible for non-commercial work.
+  const servicePackageId = input.job.service_package_id as string | null | undefined;
+  if (servicePackageId && providerRows.length) {
+    const { data: servicePackage } = await input.supabase
+      .from("service_packages")
+      .select("tier")
+      .eq("id", servicePackageId)
+      .maybeSingle();
+
+    if (servicePackage?.tier === "commercial") {
+      const { data: certifications } = await input.supabase
+        .from("provider_certifications")
+        .select("provider_id, tier")
+        .eq("category", input.category)
+        .eq("is_active", true)
+        .in("provider_id", providerRows.map((provider) => provider.id));
+
+      const eligibleProviderIds = new Set(
+        (certifications ?? [])
+          .filter((row) => row.tier === "gold" || row.tier === "elite")
+          .map((row) => row.provider_id)
+      );
+      providerRows = providerRows.filter((provider) => eligibleProviderIds.has(provider.id));
+    }
+  }
+
   const filteredProviderIds = providerRows.map((provider) => provider.id);
   const [{ data: availability }, { data: settings }, { data: todaysJobs }] = await Promise.all([
     input.supabase.from("provider_availability").select("*").eq("tenant_id", input.tenantId).in("provider_id", filteredProviderIds.length ? filteredProviderIds : ["00000000-0000-0000-0000-000000000000"]),
