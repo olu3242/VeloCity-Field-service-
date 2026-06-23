@@ -49,3 +49,12 @@ All 18 tables meet every criterion except the live row-count check, which requir
 ## Conclusion
 
 All 18 tables from migrations 011/012/013 are classified **ORPHANED**. None are referenced by application code, foreign keys, triggers, views, functions, or cron jobs. They are recommended as decommission candidates, pending live confirmation of zero rows (see `DATABASE_DECOMMISSION_PLAN.md`).
+
+## Addendum (Batch X): Agent references, workflow references, last-updated timestamps
+
+Cross-checked against the independent Batch X registry/framework inventory (`RUNTIME_CONVERGENCE_AUDIT.md`) and evidence/logging inventory (`EVIDENCE_ARCHITECTURE_AUDIT.md`):
+
+- **Agent references**: Zero. No agent file (`src/lib/agents/*.ts`), no automation handler (`src/lib/automation/handlers/*.ts`), and no call to `runAgent()` references any of the 18 tables. `agent_logs` (the real, AUTHORITATIVE evidence table for every agent call — written unconditionally by `src/lib/agents/base.ts`) contains zero rows pointing at these tables because no agent ever queries or writes them.
+- **Workflow references**: Zero. The real job workflow engine — `src/lib/workflows/job-state-machine.ts` (`canTransition()`, enforced at `src/app/api/jobs/[id]/transition/route.ts:64`) and its evidence table `job_status_history` — does not read or write any of the 18 tables, including `stateful_workflow_states` and `workflow_temporal_history`, whose names most resemble workflow infrastructure. Confirmed via the Batch X evidence-table sweep: `workflow_temporal_history` has **0 write call sites anywhere in `src/`**.
+- **Last-updated timestamps / row counts**: Still cannot be determined without a live database connection (unchanged from the original audit). The Batch X sweep adds no new evidence here since it is static-analysis-only, same as before — this remains the single open item before any DROP migration, per `DATABASE_DECOMMISSION_PLAN.md`.
+- **Net effect on classification**: No change. All 18 tables remain **ORPHANED** under the stricter Batch X criteria (zero app code, zero FK, zero trigger, zero view/function, zero cron, **zero agent, zero workflow** references).

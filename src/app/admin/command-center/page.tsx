@@ -126,6 +126,7 @@ export default async function AdminCommandCenterPage() {
     { data: personaAssignments },
     { data: profiles },
     { data: serviceTypes },
+    { data: auditLogs },
   ] = await Promise.all([
     supabase.from("jobs").select("*").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(500),
     supabase.from("providers").select("*").eq("tenant_id", tenantId).limit(500),
@@ -142,6 +143,7 @@ export default async function AdminCommandCenterPage() {
     supabase.from("persona_assignments").select("id,user_id,personas(key,name)").eq("tenant_id", tenantId).eq("is_active", true).limit(200),
     supabase.from("profiles").select("id,role,created_at").eq("tenant_id", tenantId).limit(200),
     supabase.from("service_types").select("id,name,category").eq("tenant_id", tenantId).eq("is_active", true).limit(200),
+    supabase.from("audit_logs").select("id,action,created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(200),
   ]);
 
   const jobRows = (jobs ?? []) as Job[];
@@ -278,6 +280,50 @@ export default async function AdminCommandCenterPage() {
     }))
     .sort((a, b) => b.revenueCents - a.revenueCents);
 
+  // System Health (Batch X, Phase 7): reuses data already queried above —
+  // no new dashboard, no new tables, just additional aggregation over the
+  // existing agent_logs / automation_queue / jobs / audit_logs result sets.
+  const agentExecutionTotal = agentActivity.reduce((sum, agent) => sum + agent.executionCount, 0);
+  const agentFailureTotal = agentActivity.reduce((sum, agent) => sum + agent.failureCount, 0);
+  const agentHealth = {
+    totalAgents: agentActivity.length,
+    activeAgents: agentActivity.filter((agent) => agent.executionCount > 0).length,
+    executionVolume: agentExecutionTotal,
+    successRatePct: agentExecutionTotal ? Math.round(((agentExecutionTotal - agentFailureTotal) / agentExecutionTotal) * 100) : null,
+    failureRatePct: agentExecutionTotal ? Math.round((agentFailureTotal / agentExecutionTotal) * 100) : null,
+  };
+
+  const workflowThroughput = completedJobs.length + activeJobs.length;
+  const workflowHealth = {
+    throughput: workflowThroughput,
+    successRatePct: workflowThroughput ? Math.round((completedJobs.length / workflowThroughput) * 100) : null,
+    unassigned: unassignedJobs.length,
+    slaBreaches: metrics.slaBreaches,
+  };
+
+  const eventHealth = {
+    volume: automationRows.length,
+    successRatePct: automationRows.length ? Math.round((completedAutomations.length / automationRows.length) * 100) : null,
+    failureRatePct: automationRows.length ? Math.round((failedAutomations.length / automationRows.length) * 100) : null,
+    retries: retryTotal,
+  };
+
+  // Database Health references the static, file-evidenced findings in
+  // docs/velocity/DATABASE_DECOMMISSION_AUDIT.md rather than a live
+  // information_schema query (no live row-count connection available from
+  // this dashboard); the orphaned-table count is a known constant, not a
+  // live metric.
+  const databaseHealth = {
+    orphanedTables: 18,
+    activeCoreTables: 9,
+  };
+
+  const evidenceHealth = {
+    agentLogVolume: agentLogs?.length ?? 0,
+    auditLogVolume: auditLogs?.length ?? 0,
+    accessAuditVolume: accessAudits?.length ?? 0,
+  };
+
   const ops = calculateOpsHealthScore(metrics);
   const revenue = calculateRevenueHealthScore(metrics);
   const automation = calculateAutomationHealthScore(metrics);
@@ -350,6 +396,54 @@ export default async function AdminCommandCenterPage() {
               </CardContent>
             </Card>
           ))}
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">System Health</h2>
+          <div className="grid gap-4 md:grid-cols-5">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Agent Health</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{agentHealth.activeAgents}/{agentHealth.totalAgents} active</div>
+                <div className="text-xs text-gray-500">Volume: {agentHealth.executionVolume}</div>
+                <div className="text-xs text-gray-500">
+                  Success: {agentHealth.successRatePct === null ? "—" : `${agentHealth.successRatePct}%`} · Failure: {agentHealth.failureRatePct === null ? "—" : `${agentHealth.failureRatePct}%`}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Workflow Health</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>Throughput: {workflowHealth.throughput}</div>
+                <div className="text-xs text-gray-500">Completion: {workflowHealth.successRatePct === null ? "—" : `${workflowHealth.successRatePct}%`}</div>
+                <div className="text-xs text-gray-500">Unassigned: {workflowHealth.unassigned} · SLA breaches: {workflowHealth.slaBreaches}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Event Health</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>Volume: {eventHealth.volume}</div>
+                <div className="text-xs text-gray-500">
+                  Success: {eventHealth.successRatePct === null ? "—" : `${eventHealth.successRatePct}%`} · Failure: {eventHealth.failureRatePct === null ? "—" : `${eventHealth.failureRatePct}%`}
+                </div>
+                <div className="text-xs text-gray-500">Retries: {eventHealth.retries}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Database Health</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{databaseHealth.activeCoreTables} authoritative evidence tables</div>
+                <div className="text-xs text-gray-500">{databaseHealth.orphanedTables} orphaned tables flagged (see Decommission Audit)</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Evidence Health</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>Agent logs: {evidenceHealth.agentLogVolume}</div>
+                <div className="text-xs text-gray-500">Audit logs: {evidenceHealth.auditLogVolume} · Access audits: {evidenceHealth.accessAuditVolume}</div>
+              </CardContent>
+            </Card>
+          </div>
         </section>
 
         <section className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
