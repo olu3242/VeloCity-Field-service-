@@ -25,6 +25,8 @@ import { computeRecurringRevenueIntelligence } from "@/lib/membership/membership
 import { computeMembershipRetentionIntelligence } from "@/lib/membership/membershipRetentionIntelligence";
 import { computeCommercialRevenueIntelligence } from "@/lib/commercial/commercialRevenueIntelligence";
 import { computeExecutiveIntelligence } from "@/lib/governance/executiveIntelligence";
+import { getOperatorState } from "@/lib/governance/operator";
+import { getAllCircuits } from "@/lib/governance/circuit-breaker";
 
 interface AgentLogRow {
   id: string;
@@ -350,6 +352,15 @@ export default async function AdminCommandCenterPage() {
     accessAuditVolume: accessAudits?.length ?? 0,
   };
 
+  // Runtime & Operator Controls (Phase 7): reads the same in-memory
+  // operator/circuit-breaker singletons that back /api/admin/runtime,
+  // closing the prior blind spot where pause state, disabled
+  // agents/event-types, and circuit health had zero Command Center
+  // visibility. Read-only here — actions remain on /api/admin/runtime.
+  const operatorState = getOperatorState();
+  const circuits = getAllCircuits();
+  const openCircuits = circuits.filter((c) => c.state === "open");
+
   // Provider Excellence Intelligence (Batch X+1, Phase 9): reuses the
   // existing parallel query set plus the two new provider_skills/
   // provider_certifications queries above — no new dashboard, computed
@@ -534,6 +545,48 @@ export default async function AdminCommandCenterPage() {
               <CardContent className="space-y-1 text-sm">
                 <div>Agent logs: {evidenceHealth.agentLogVolume}</div>
                 <div className="text-xs text-gray-500">Audit logs: {evidenceHealth.auditLogVolume} · Access audits: {evidenceHealth.accessAuditVolume}</div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Runtime &amp; Operator Controls</h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Runtime State</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div className="flex items-center justify-between">
+                  <span>{operatorState.runtimePaused ? "Paused" : "Running"}</span>
+                  <Badge variant={operatorState.runtimePaused ? "destructive" : "success"}>
+                    {operatorState.runtimePaused ? "paused" : "active"}
+                  </Badge>
+                </div>
+                {operatorState.runtimePaused && (
+                  <div className="text-xs text-gray-500">
+                    By {operatorState.pausedBy ?? "unknown"} at {operatorState.pausedAt ? new Date(operatorState.pausedAt).toLocaleString() : "—"}
+                    {operatorState.pauseReason ? ` — ${operatorState.pauseReason}` : ""}
+                  </div>
+                )}
+                <div className="mt-2 text-xs text-gray-400">Read-only here — pause/resume/disable actions are issued via the /api/admin/runtime API.</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Disabled Agents / Event Types</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div className="text-xs text-gray-500">Disabled agents: {operatorState.disabledAgents.size ? Array.from(operatorState.disabledAgents).join(", ") : "none"}</div>
+                <div className="text-xs text-gray-500">Disabled event types: {operatorState.disabledEventTypes.size ? Array.from(operatorState.disabledEventTypes).join(", ") : "none"}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Circuit Breakers</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm">
+                <div>{circuits.length} tracked · <Badge variant={openCircuits.length ? "destructive" : "success"}>{openCircuits.length} open</Badge></div>
+                {openCircuits.length ? (
+                  <div className="text-xs text-gray-500">{openCircuits.map((c) => c.key).join(", ")}</div>
+                ) : (
+                  <div className="text-xs text-gray-500">No open circuits.</div>
+                )}
               </CardContent>
             </Card>
           </div>

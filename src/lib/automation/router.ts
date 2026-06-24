@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
 import { isAgentEnabled, isEventTypeEnabled } from "@/lib/governance/operator";
+import { isOpen, recordSuccess, recordFailure } from "@/lib/governance/circuit-breaker";
 import { routeGrowthAutomationEvent } from "./growthEvents";
 import type { AutomationEventType, AutomationRouteResult } from "./types";
 import type { AutomationQueueItem, AutomationPayload, HandlerResult } from "@/types/automation";
@@ -43,12 +44,28 @@ function syntheticQueueItem(eventType: AutomationEventType, payload: AutomationP
   };
 }
 
-// ── Operator gate: skip a handler call if its agent has been disabled ─────
+// ── Operator + circuit-breaker gate: skip a handler call if its agent has
+// been disabled, or its circuit is open from repeated recent failures; record
+// the outcome of every call that does run so the breaker reflects real health.
 async function callIfEnabled(actionName: string, fn: () => Promise<HandlerResult>): Promise<HandlerResult> {
   if (!isAgentEnabled(actionName)) {
     return { success: true, output: { skipped: `agent_disabled:${actionName}` } };
   }
-  return fn();
+  if (isOpen(actionName)) {
+    return { success: false, error: `circuit_open:${actionName}`, output: { skipped: `circuit_open:${actionName}` } };
+  }
+  try {
+    const result = await fn();
+    if (result.success) {
+      recordSuccess(actionName);
+    } else {
+      recordFailure(actionName);
+    }
+    return result;
+  } catch (err) {
+    recordFailure(actionName);
+    throw err;
+  }
 }
 
 // ── Main router ────────────────────────────────────────────────────────────
@@ -220,11 +237,7 @@ export async function routeAutomationEvent(
       case "territory_ready_for_expansion":
       case "franchise_candidate_area_detected": {
         actions.push("tess-territory");
-        if (!isAgentEnabled("tess-territory")) {
-          output.tess = { success: true, output: { skipped: "agent_disabled:tess-territory" } };
-          break;
-        }
-        if (eventType !== "daily_territory_analysis") {
+        if (eventType !== "daily_territory_analysis" && isAgentEnabled("tess-territory") && !isOpen("tess-territory")) {
           output.growth = routeGrowthAutomationEvent({
             type: eventType,
             tenantId: String(payload.tenant_id ?? "default"),
@@ -236,7 +249,7 @@ export async function routeAutomationEvent(
               : ["Review growth signal."],
           });
         }
-        const result = await handleTessTerritory(typedPayload, queueItem);
+        const result = await callIfEnabled("tess-territory", () => handleTessTerritory(typedPayload, queueItem));
         output.tess = result;
         break;
       }
