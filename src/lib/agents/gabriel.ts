@@ -1,9 +1,5 @@
 // GABRIEL — Governance, Compliance & Audit Agent
 import { BaseAgent, type AgentContext } from "./base";
-import {
-  computeExecutiveIntelligence,
-  type ExecutiveBriefing,
-} from "@/lib/governance/executiveIntelligence";
 
 export interface GabrielComplianceOutput {
   compliant: boolean;
@@ -112,16 +108,6 @@ Is this job record compliant? Respond with JSON.`;
 
     const result = await this.run<GabrielComplianceOutput>(prompt, context);
     return result.success ? (result.data ?? null) : null;
-  }
-
-  /**
-   * Executive Intelligence (Batch X+3) — aggregates the existing FINN
-   * recurring/commercial revenue reports, ALICE retention risk, and NOVA
-   * expansion pipeline into a single briefing. No new computation — every
-   * figure is a direct read of an already-certified report.
-   */
-  async generateExecutiveBriefing(): Promise<ExecutiveBriefing> {
-    return computeExecutiveIntelligence();
   }
 }
 

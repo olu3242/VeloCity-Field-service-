@@ -36,8 +36,8 @@ export async function computeMarketDemand(territoryId: string): Promise<MarketDe
   const priorStart = new Date(now.getTime() - 2 * WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   const [{ data: recentJobs }, { data: priorJobs }] = await Promise.all([
-    db.from("jobs").select("category").in("zip", zipCodes).gte("created_at", recentStart.toISOString()),
-    db.from("jobs").select("category").in("zip", zipCodes).gte("created_at", priorStart.toISOString()).lt("created_at", recentStart.toISOString()),
+    db.from("jobs").select("category").eq("tenant_id", territory.tenant_id).in("zip", zipCodes).gte("created_at", recentStart.toISOString()),
+    db.from("jobs").select("category").eq("tenant_id", territory.tenant_id).in("zip", zipCodes).gte("created_at", priorStart.toISOString()).lt("created_at", recentStart.toISOString()),
   ]);
 
   const reports: MarketDemandCategoryReport[] = ALL_CATEGORIES.map((category) => {

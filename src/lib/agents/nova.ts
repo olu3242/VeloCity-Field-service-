@@ -139,8 +139,8 @@ What reminders should be sent and when? Respond with JSON.`;
    * membership_plan_pricing. No new growth engine — delegates entirely to
    * membershipGrowthIntelligence.ts.
    */
-  async recommendMembershipGrowth(customerId: string): Promise<MembershipGrowthReport> {
-    return computeMembershipGrowthIntelligence(customerId);
+  async recommendMembershipGrowth(customerId: string, tenantId: string): Promise<MembershipGrowthReport> {
+    return computeMembershipGrowthIntelligence(customerId, tenantId);
   }
 
   /**

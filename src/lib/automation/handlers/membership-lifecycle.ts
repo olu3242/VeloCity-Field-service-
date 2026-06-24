@@ -15,15 +15,18 @@ export async function handleMembershipLifecycle(
   item: AutomationQueueItem
 ): Promise<HandlerResult> {
   const payload = rawPayload as Record<string, unknown>;
-  const { membership_subscription_id, customer_id } = payload;
+  const { membership_subscription_id, customer_id, tenant_id } = payload;
   const db = getAdminClient();
 
   if (!membership_subscription_id || typeof membership_subscription_id !== "string") {
     return { success: true, output: { skipped: "no membership_subscription_id" } };
   }
+  if (!tenant_id || typeof tenant_id !== "string") {
+    return { success: true, output: { skipped: "no tenant_id on payload" } };
+  }
 
   if (item.event_type === "membership_cancelled" || item.event_type === "renewal_failed") {
-    const retention = await alice.assessMembershipRetention();
+    const retention = await alice.assessMembershipRetention(tenant_id);
     const relevant = retention.retentionWorkflows.filter((w) => w.subscriptionId === membership_subscription_id);
     for (const action of relevant) {
       await db.from("notifications").insert({
@@ -40,7 +43,7 @@ export async function handleMembershipLifecycle(
 
   if (item.event_type === "membership_expiring") {
     if (typeof customer_id === "string") {
-      const growth = await nova.recommendMembershipGrowth(customer_id);
+      const growth = await nova.recommendMembershipGrowth(customer_id, tenant_id);
       await db.from("notifications").insert({
         user_id: customer_id,
         type: "retention",

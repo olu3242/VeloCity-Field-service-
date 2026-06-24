@@ -1,7 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "@/lib/supabase/admin";
+import { isRuntimePaused } from "@/lib/governance/operator";
 import { routeAutomationEvent } from "./router";
 import type { AutomationQueueRow } from "./types";
+
+const BASE_RETRY_DELAY_MS = 60_000;
+const MAX_RETRY_DELAY_MS = 15 * 60_000;
+
+// Exponential backoff with full jitter (1, 2, 4 min base, randomized) —
+// replaces the prior linear (1/2/3 min) schedule so retries spread out
+// instead of converging on the same retry window under bursty failures.
+function retryDelayMs(retryCount: number): number {
+  const exponential = Math.min(MAX_RETRY_DELAY_MS, BASE_RETRY_DELAY_MS * 2 ** (retryCount - 1));
+  return Math.floor(Math.random() * exponential);
+}
 
 export interface AutomationWorkerResult {
   processed: number;
@@ -19,6 +31,12 @@ export async function processAutomationQueue(
 ): Promise<AutomationWorkerResult> {
   const client = supabase ?? getAdminClient();
   const result: AutomationWorkerResult = { processed: 0, completed: 0, succeeded: 0, failed: 0, skipped: 0, errors: [] };
+
+  // Operator-paused runtime holds all events: leave the queue untouched so
+  // pending/failed rows pick back up exactly where they were once resumed.
+  if (isRuntimePaused()) {
+    return { ...result, skipped: limit };
+  }
 
   let query = client
     .from("automation_queue")
@@ -75,7 +93,7 @@ export async function processAutomationQueue(
         status: retryCount >= 3 ? "failed" : "pending",
         retry_count: retryCount,
         error_message: message,
-        available_at: new Date(Date.now() + retryCount * 60_000).toISOString(),
+        available_at: new Date(Date.now() + retryDelayMs(retryCount)).toISOString(),
         processed_at: retryCount >= 3 ? new Date().toISOString() : null,
       }).eq("id", row.id);
       if (run?.id) {

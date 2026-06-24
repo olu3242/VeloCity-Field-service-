@@ -4,9 +4,10 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { isAgentEnabled, isEventTypeEnabled } from "@/lib/governance/operator";
 import { routeGrowthAutomationEvent } from "./growthEvents";
 import type { AutomationEventType, AutomationRouteResult } from "./types";
-import type { AutomationQueueItem, AutomationPayload } from "@/types/automation";
+import type { AutomationQueueItem, AutomationPayload, HandlerResult } from "@/types/automation";
 
 // ── Handler imports ────────────────────────────────────────────────────────
 import { handleAliceIntake } from "./handlers/alice-intake";
@@ -42,6 +43,14 @@ function syntheticQueueItem(eventType: AutomationEventType, payload: AutomationP
   };
 }
 
+// ── Operator gate: skip a handler call if its agent has been disabled ─────
+async function callIfEnabled(actionName: string, fn: () => Promise<HandlerResult>): Promise<HandlerResult> {
+  if (!isAgentEnabled(actionName)) {
+    return { success: true, output: { skipped: `agent_disabled:${actionName}` } };
+  }
+  return fn();
+}
+
 // ── Main router ────────────────────────────────────────────────────────────
 export async function routeAutomationEvent(
   eventType: AutomationEventType,
@@ -57,13 +66,17 @@ export async function routeAutomationEvent(
   const queueItem = syntheticQueueItem(eventType, typedPayload);
 
   try {
+    if (!isEventTypeEnabled(eventType)) {
+      actions.push("event-type-disabled");
+      output.skipped = `event_type_disabled:${eventType}`;
+    } else {
     switch (eventType) {
       // ── ALICE: Intake / Serviceability ──────────────────────────────────
       case "service_request_created":
       case "serviceability_passed":
       case "serviceability_failed": {
         actions.push("alice-intake");
-        const result = await handleAliceIntake(typedPayload, queueItem);
+        const result = await callIfEnabled("alice-intake", () => handleAliceIntake(typedPayload, queueItem));
         output.alice = result;
         break;
       }
@@ -75,9 +88,9 @@ export async function routeAutomationEvent(
       case "provider_penalty_applied":
       case "no_provider_accepted": {
         actions.push("provider-offer", "max-dispatch");
-        const offerResult = await handleProviderOffer(typedPayload, queueItem);
+        const offerResult = await callIfEnabled("provider-offer", () => handleProviderOffer(typedPayload, queueItem));
         output.offer = offerResult;
-        const dispatchResult = await handleMaxDispatch(typedPayload, queueItem);
+        const dispatchResult = await callIfEnabled("max-dispatch", () => handleMaxDispatch(typedPayload, queueItem));
         output.max = dispatchResult;
         break;
       }
@@ -88,7 +101,7 @@ export async function routeAutomationEvent(
       case "job_started":
       case "provider_arrived": {
         actions.push("nova-workflow");
-        const result = await handleNovaWorkflow(typedPayload, queueItem);
+        const result = await callIfEnabled("nova-workflow", () => handleNovaWorkflow(typedPayload, queueItem));
         output.nova = result;
         break;
       }
@@ -97,9 +110,9 @@ export async function routeAutomationEvent(
       case "job_completed":
       case "customer_confirmed": {
         actions.push("rex-completion", "nova-workflow");
-        const rexResult = await handleRexCompletion(typedPayload, queueItem);
+        const rexResult = await callIfEnabled("rex-completion", () => handleRexCompletion(typedPayload, queueItem));
         output.rex = rexResult;
-        const novaResult = await handleNovaWorkflow(typedPayload, queueItem);
+        const novaResult = await callIfEnabled("nova-workflow", () => handleNovaWorkflow(typedPayload, queueItem));
         output.nova = novaResult;
         break;
       }
@@ -112,11 +125,11 @@ export async function routeAutomationEvent(
       case "quote_approved":
       case "quote_rejected": {
         actions.push("quinn-quote");
-        const result = await handleQuinnQuote(typedPayload, queueItem);
+        const result = await callIfEnabled("quinn-quote", () => handleQuinnQuote(typedPayload, queueItem));
         output.quinn = result;
         if (eventType === "quote_approved") {
           actions.push("finn-payment");
-          const finnResult = await handleFinnPayment(typedPayload, queueItem);
+          const finnResult = await callIfEnabled("finn-payment", () => handleFinnPayment(typedPayload, queueItem));
           output.finn = finnResult;
         }
         break;
@@ -132,7 +145,7 @@ export async function routeAutomationEvent(
       case "refund_issued":
       case "chargeback_opened": {
         actions.push("finn-payment");
-        const result = await handleFinnPayment(typedPayload, queueItem);
+        const result = await callIfEnabled("finn-payment", () => handleFinnPayment(typedPayload, queueItem));
         output.finn = result;
         break;
       }
@@ -144,9 +157,9 @@ export async function routeAutomationEvent(
       case "payout_failed":
       case "payout_retry_scheduled": {
         actions.push("payout-release", "finn-payment");
-        const payoutResult = await handlePayoutRelease(typedPayload, queueItem);
+        const payoutResult = await callIfEnabled("payout-release", () => handlePayoutRelease(typedPayload, queueItem));
         output.payout = payoutResult;
-        const finnResult = await handleFinnPayment(typedPayload, queueItem);
+        const finnResult = await callIfEnabled("finn-payment", () => handleFinnPayment(typedPayload, queueItem));
         output.finn = finnResult;
         break;
       }
@@ -155,7 +168,7 @@ export async function routeAutomationEvent(
       case "dispute_opened":
       case "dispute_resolved": {
         actions.push("ivy-dispute");
-        const result = await handleIvyDispute(typedPayload, queueItem);
+        const result = await callIfEnabled("ivy-dispute", () => handleIvyDispute(typedPayload, queueItem));
         output.ivy = result;
         break;
       }
@@ -167,7 +180,7 @@ export async function routeAutomationEvent(
       case "retention_campaign":
       case "retention_campaign_due": {
         actions.push("lena-retention");
-        const result = await handleLenaRetention(typedPayload, queueItem);
+        const result = await callIfEnabled("lena-retention", () => handleLenaRetention(typedPayload, queueItem));
         output.lena = result;
         break;
       }
@@ -176,7 +189,7 @@ export async function routeAutomationEvent(
       case "provider_scoring":
       case "provider_scoring_due": {
         actions.push("rex-completion");
-        const result = await handleRexCompletion(typedPayload, queueItem);
+        const result = await callIfEnabled("rex-completion", () => handleRexCompletion(typedPayload, queueItem));
         output.rex = result;
         break;
       }
@@ -191,7 +204,7 @@ export async function routeAutomationEvent(
       case "job_stuck":
       case "provider_late": {
         actions.push("sla-check");
-        const result = await handleSLACheck(typedPayload, queueItem);
+        const result = await callIfEnabled("sla-check", () => handleSLACheck(typedPayload, queueItem));
         output.sla = result;
         break;
       }
@@ -207,6 +220,10 @@ export async function routeAutomationEvent(
       case "territory_ready_for_expansion":
       case "franchise_candidate_area_detected": {
         actions.push("tess-territory");
+        if (!isAgentEnabled("tess-territory")) {
+          output.tess = { success: true, output: { skipped: "agent_disabled:tess-territory" } };
+          break;
+        }
         if (eventType !== "daily_territory_analysis") {
           output.growth = routeGrowthAutomationEvent({
             type: eventType,
@@ -231,7 +248,7 @@ export async function routeAutomationEvent(
       case "membership_cancelled":
       case "renewal_failed": {
         actions.push("membership-lifecycle");
-        const result = await handleMembershipLifecycle(typedPayload, queueItem);
+        const result = await callIfEnabled("membership-lifecycle", () => handleMembershipLifecycle(typedPayload, queueItem));
         output.membership = result;
         break;
       }
@@ -239,7 +256,7 @@ export async function routeAutomationEvent(
       // ── Tips ─────────────────────────────────────────────────────────────
       case "tip_submitted": {
         actions.push("tip-submitted");
-        const result = await handleTipSubmitted(typedPayload, queueItem);
+        const result = await callIfEnabled("tip-submitted", () => handleTipSubmitted(typedPayload, queueItem));
         output.tip = result;
         break;
       }
@@ -256,6 +273,7 @@ export async function routeAutomationEvent(
         }).then(() => null);
         output.gabriel = { handled: false, event_type: eventType, note: "No specific handler — GABRIEL audit logged" };
       }
+    }
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

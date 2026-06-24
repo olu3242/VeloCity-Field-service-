@@ -32,7 +32,7 @@ export async function computeMarketSupply(territoryId: string): Promise<MarketSu
   const zipCodes: string[] = territory.zip_codes ?? [];
   if (!zipCodes.length) return [];
 
-  const { data: areas } = await db.from("service_areas").select("id, zip_codes");
+  const { data: areas } = await db.from("service_areas").select("id, zip_codes").eq("tenant_id", territory.tenant_id);
   const areaIds = (areas ?? [])
     .filter((a) => (a.zip_codes ?? []).some((z: string) => zipCodes.includes(z)))
     .map((a) => a.id);
@@ -42,6 +42,7 @@ export async function computeMarketSupply(territoryId: string): Promise<MarketSu
   const { data: providers } = await db
     .from("providers")
     .select("categories, response_time_minutes, status")
+    .eq("tenant_id", territory.tenant_id)
     .overlaps("service_area_ids", areaIds)
     .eq("status", "active");
 

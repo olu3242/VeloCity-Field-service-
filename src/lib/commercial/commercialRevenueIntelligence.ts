@@ -32,15 +32,20 @@ export interface CommercialRevenueReport {
 
 const RENEWAL_WINDOW_DAYS = 30;
 
-export async function computeCommercialRevenueIntelligence(): Promise<CommercialRevenueReport> {
+export async function computeCommercialRevenueIntelligence(tenantId: string): Promise<CommercialRevenueReport> {
   const db = getAdminClient();
 
   const { data: contracts } = await db
     .from("commercial_contracts")
     .select("id, status, contract_value_cents, start_date, end_date, account_id, commercial_accounts(name)")
+    .eq("tenant_id", tenantId)
     .in("status", ["active", "at_risk"]);
 
-  const { data: revenueRows } = await db.from("revenue_records").select("gross_amount_cents, commercial_account_id").not("commercial_account_id", "is", null);
+  const { data: revenueRows } = await db
+    .from("revenue_records")
+    .select("gross_amount_cents, commercial_account_id")
+    .eq("tenant_id", tenantId)
+    .not("commercial_account_id", "is", null);
 
   const revenueByAccount = new Map<string, number>();
   for (const row of revenueRows ?? []) {

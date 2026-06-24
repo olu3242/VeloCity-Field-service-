@@ -35,14 +35,14 @@ export interface ExecutiveBriefing {
   };
 }
 
-export async function computeExecutiveIntelligence(): Promise<ExecutiveBriefing> {
+export async function computeExecutiveIntelligence(tenantId: string): Promise<ExecutiveBriefing> {
   const db = getAdminClient();
 
   const [recurring, commercial, retention, { data: opportunities }] = await Promise.all([
-    computeRecurringRevenueIntelligence(),
-    computeCommercialRevenueIntelligence(),
-    computeMembershipRetentionIntelligence(),
-    db.from("market_opportunities").select("expected_revenue_impact_cents").eq("status", "open"),
+    computeRecurringRevenueIntelligence(tenantId),
+    computeCommercialRevenueIntelligence(tenantId),
+    computeMembershipRetentionIntelligence(tenantId),
+    db.from("market_opportunities").select("expected_revenue_impact_cents").eq("tenant_id", tenantId).eq("status", "open"),
   ]);
 
   return {

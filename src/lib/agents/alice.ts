@@ -75,8 +75,8 @@ Classify this request and respond with JSON.`;
    * workflows they trigger. Read-time only, delegates entirely to
    * membershipRetentionIntelligence.ts (no new retention engine).
    */
-  async assessMembershipRetention(): Promise<MembershipRetentionReport> {
-    return computeMembershipRetentionIntelligence();
+  async assessMembershipRetention(tenantId: string): Promise<MembershipRetentionReport> {
+    return computeMembershipRetentionIntelligence(tenantId);
   }
 }
 

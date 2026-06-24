@@ -21,10 +21,10 @@ async function getRegistryData() {
   }
 }
 
-async function getDriftData(db: ReturnType<typeof getAdminClient>) {
+async function getDriftData(db: ReturnType<typeof getAdminClient>, tenantId: string) {
   try {
     const { detectDrift, getDriftScore } = await import("@/lib/governance/drift-detector");
-    const drifts = await detectDrift(db);
+    const drifts = await detectDrift(db, tenantId);
     return { drifts, score: getDriftScore(drifts) };
   } catch {
     return { drifts: [], score: 85 };
@@ -64,16 +64,22 @@ export default async function LaxCommandCenter() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, tenant_id")
     .eq("id", user.id)
     .maybeSingle();
 
   if (profile?.role !== "admin" && profile?.role !== "super_admin") redirect("/dashboard");
+  const tenantId = profile.tenant_id;
+  if (!tenantId) redirect("/dashboard");
 
   const db = getAdminClient();
   const envStatus = getEnvStatus();
 
-  // Parallel data fetch
+  // Parallel data fetch — every query below is scoped to the requesting
+  // admin's own tenant_id. This page uses the service-role client (to read
+  // agent_logs/automation_runs in one pass alongside the registry/drift
+  // data above), so RLS does not apply here and the tenant filter must be
+  // applied explicitly on every query, same as /api/runtime/trace/[id].
   const [
     registryData,
     driftData,
@@ -90,18 +96,18 @@ export default async function LaxCommandCenter() {
     { count: deadLetterQueue },
   ] = await Promise.all([
     getRegistryData(),
-    getDriftData(db),
-    db.from("automation_queue").select("status").gte("created_at", new Date(Date.now() - 3_600_000).toISOString()),
-    db.from("automation_queue").select("event_type, error_message, created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(8),
-    db.from("automation_runs").select("event_type, status, completed_at").order("completed_at", { ascending: false }).limit(6),
-    db.from("agent_logs").select("agent_name, action, created_at").order("created_at", { ascending: false }).limit(6),
-    db.from("jobs").select("*", { count: "exact", head: true }),
-    db.from("jobs").select("*", { count: "exact", head: true }).not("status", "in", '("completed","closed","cancelled","expired","refunded")'),
-    db.from("providers").select("*", { count: "exact", head: true }).eq("status", "pending"),
-    db.from("disputes").select("*", { count: "exact", head: true }).eq("status", "open"),
-    db.from("automation_queue").select("*", { count: "exact", head: true }).eq("status", "pending"),
-    db.from("automation_queue").select("*", { count: "exact", head: true }).eq("status", "failed"),
-    db.from("automation_queue").select("*", { count: "exact", head: true }).eq("status", "dead_letter"),
+    getDriftData(db, tenantId),
+    db.from("automation_queue").select("status").eq("tenant_id", tenantId).gte("created_at", new Date(Date.now() - 3_600_000).toISOString()),
+    db.from("automation_queue").select("event_type, error_message, created_at").eq("tenant_id", tenantId).eq("status", "failed").order("created_at", { ascending: false }).limit(8),
+    db.from("automation_runs").select("event_type, status, completed_at").eq("tenant_id", tenantId).order("completed_at", { ascending: false }).limit(6),
+    db.from("agent_logs").select("agent_name, action, created_at").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(6),
+    db.from("jobs").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId),
+    db.from("jobs").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).not("status", "in", '("completed","closed","cancelled","expired","refunded")'),
+    db.from("providers").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "pending"),
+    db.from("disputes").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "open"),
+    db.from("automation_queue").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "pending"),
+    db.from("automation_queue").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "failed"),
+    db.from("automation_queue").select("*", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "dead_letter"),
   ]);
 
   const queueCounts = (queueStats ?? []).reduce(

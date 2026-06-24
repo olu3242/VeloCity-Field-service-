@@ -54,7 +54,7 @@ export interface MembershipRetentionReport {
   retentionWorkflows: RetentionWorkflowAction[];
 }
 
-export async function computeMembershipRetentionIntelligence(): Promise<MembershipRetentionReport> {
+export async function computeMembershipRetentionIntelligence(tenantId: string): Promise<MembershipRetentionReport> {
   const db = getAdminClient();
   const now = new Date();
   const sevenDaysOut = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -62,6 +62,7 @@ export async function computeMembershipRetentionIntelligence(): Promise<Membersh
   const { data: activeSubs } = await db
     .from("membership_subscriptions")
     .select("id, customer_id, plan_id, current_period_start, current_period_end, membership_plans(name)")
+    .eq("tenant_id", tenantId)
     .eq("status", "active");
 
   const subs = activeSubs ?? [];
@@ -89,22 +90,25 @@ export async function computeMembershipRetentionIntelligence(): Promise<Membersh
         db
           .from("membership_entitlements")
           .select("id, included_uses_per_period, service_types(name)")
+          .eq("tenant_id", tenantId)
           .eq("plan_id", sub.plan_id)
           .not("included_uses_per_period", "is", null),
         db
           .from("membership_usage")
           .select("entitlement_id")
+          .eq("tenant_id", tenantId)
           .eq("subscription_id", sub.id)
           .gte("period_start", sub.current_period_start)
           .lte("period_end", sub.current_period_end),
         db
           .from("jobs")
           .select("id, created_at")
+          .eq("tenant_id", tenantId)
           .eq("customer_id", sub.customer_id)
           .order("created_at", { ascending: false })
           .limit(1),
-        db.from("disputes").select("id").eq("customer_id", sub.customer_id).eq("status", "open"),
-        db.from("reviews").select("rating").eq("customer_id", sub.customer_id).order("created_at", { ascending: false }).limit(1),
+        db.from("disputes").select("id").eq("tenant_id", tenantId).eq("customer_id", sub.customer_id).eq("status", "open"),
+        db.from("reviews").select("rating").eq("tenant_id", tenantId).eq("customer_id", sub.customer_id).order("created_at", { ascending: false }).limit(1),
       ]);
 
     const periodEndDate = new Date(sub.current_period_end);

@@ -159,8 +159,8 @@ export default async function AdminCommandCenterPage() {
   // no new revenue or retention engine, same read-time pattern as Provider
   // Excellence Intelligence above.
   const [recurringRevenue, membershipRetention] = await Promise.all([
-    computeRecurringRevenueIntelligence(),
-    computeMembershipRetentionIntelligence(),
+    computeRecurringRevenueIntelligence(tenantId),
+    computeMembershipRetentionIntelligence(tenantId),
   ]);
 
   // Expansion Intelligence + Commercial Accounts (Batch X+3, Phase 10):
@@ -168,8 +168,8 @@ export default async function AdminCommandCenterPage() {
   // executive briefing (which itself only reads the reports above plus
   // market_opportunities) — no new dashboard, no new revenue engine.
   const [commercialRevenue, executiveBriefing] = await Promise.all([
-    computeCommercialRevenueIntelligence(),
-    computeExecutiveIntelligence(),
+    computeCommercialRevenueIntelligence(tenantId),
+    computeExecutiveIntelligence(tenantId),
   ]);
 
   const jobRows = (jobs ?? []) as Job[];

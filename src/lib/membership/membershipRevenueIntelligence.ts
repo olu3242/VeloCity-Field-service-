@@ -30,19 +30,21 @@ const MONTHLY_EQUIVALENT: Record<string, number> = {
   annual: 1 / 12,
 };
 
-export async function computeRecurringRevenueIntelligence(): Promise<RecurringRevenueReport> {
+export async function computeRecurringRevenueIntelligence(tenantId: string): Promise<RecurringRevenueReport> {
   const db = getAdminClient();
   const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
   const [{ data: activeSubs }, { data: recentEvents }, { data: plans }] = await Promise.all([
     db
       .from("membership_subscriptions")
-      .select("id, plan_id, billing_frequency, amount_cents, status, started_at, current_period_end"),
+      .select("id, plan_id, billing_frequency, amount_cents, status, started_at, current_period_end")
+      .eq("tenant_id", tenantId),
     db
       .from("membership_events")
       .select("subscription_id, event_type, created_at")
+      .eq("tenant_id", tenantId)
       .gte("created_at", ninetyDaysAgo),
-    db.from("membership_plans").select("id, name"),
+    db.from("membership_plans").select("id, name").eq("tenant_id", tenantId),
   ]);
 
   const subs = activeSubs ?? [];
@@ -67,7 +69,8 @@ export async function computeRecurringRevenueIntelligence(): Promise<RecurringRe
   // billing frequency — computed only from real plan_pricing rows.
   const { data: pricingRows } = await db
     .from("membership_plan_pricing")
-    .select("plan_id, billing_frequency, price_cents");
+    .select("plan_id, billing_frequency, price_cents")
+    .eq("tenant_id", tenantId);
   const baselinePrice = new Map<string, number>();
   for (const row of pricingRows ?? []) {
     const key = `${row.plan_id}:${row.billing_frequency}`;
@@ -93,6 +96,7 @@ export async function computeRecurringRevenueIntelligence(): Promise<RecurringRe
     const { data: revenueRows } = await db
       .from("revenue_records")
       .select("provider_payout_cents")
+      .eq("tenant_id", tenantId)
       .in(
         "membership_subscription_id",
         planSubs.map((s) => s.id)

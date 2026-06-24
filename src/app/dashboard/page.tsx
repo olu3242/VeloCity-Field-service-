@@ -16,7 +16,6 @@ import {
 import type { Job } from "@/types";
 import { computeCustomerMembershipSummary } from "@/lib/membership/customerMembershipSummary";
 import { computeCommercialAccountSummary } from "@/lib/commercial/commercialAccountSummary";
-import { getAdminClient } from "@/lib/supabase/admin";
 
 export default async function CustomerDashboard() {
   const supabase = await createClient();
@@ -51,8 +50,7 @@ export default async function CustomerDashboard() {
   // Commercial Account view (Batch X+3, Phase 11): extends this same
   // dashboard for customers who are also the primary contact of a
   // commercial account — no separate commercial portal.
-  const db = getAdminClient();
-  const { data: commercialAccountRow } = await db
+  const { data: commercialAccountRow } = await supabase
     .from("commercial_accounts")
     .select("id")
     .eq("primary_contact_id", user.id)

@@ -51,7 +51,7 @@ export interface MembershipGrowthReport {
 
 const ANNUALIZED_PERIODS: Record<string, number> = { monthly: 12, quarterly: 4, annual: 1 };
 
-export async function computeMembershipGrowthIntelligence(customerId: string): Promise<MembershipGrowthReport> {
+export async function computeMembershipGrowthIntelligence(customerId: string, tenantId: string): Promise<MembershipGrowthReport> {
   const db = getAdminClient();
   const oneEightyDaysAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -59,14 +59,16 @@ export async function computeMembershipGrowthIntelligence(customerId: string): P
     db
       .from("membership_subscriptions")
       .select("id, plan_id, billing_frequency, amount_cents, status, current_period_start, current_period_end")
+      .eq("tenant_id", tenantId)
       .eq("customer_id", customerId),
     db
       .from("jobs")
       .select("id, category, service_type_id, created_at")
+      .eq("tenant_id", tenantId)
       .eq("customer_id", customerId)
       .in("status", ["completed", "customer_confirmed"])
       .gte("created_at", oneEightyDaysAgo),
-    listMembershipPlans(),
+    listMembershipPlans(tenantId),
   ]);
 
   const activeSubscriptions = (subscriptions ?? []).filter((s) => s.status === "active");
@@ -109,6 +111,7 @@ export async function computeMembershipGrowthIntelligence(customerId: string): P
     const { data: usageRows } = await db
       .from("membership_usage")
       .select("entitlement_id")
+      .eq("tenant_id", tenantId)
       .eq("subscription_id", sub.id)
       .gte("period_start", sub.current_period_start)
       .lte("period_end", sub.current_period_end);

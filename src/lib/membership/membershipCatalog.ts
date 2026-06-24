@@ -31,12 +31,13 @@ export interface MembershipPlanSummary {
   entitlements: MembershipPlanEntitlement[];
 }
 
-export async function listMembershipPlans(): Promise<MembershipPlanSummary[]> {
+export async function listMembershipPlans(tenantId: string): Promise<MembershipPlanSummary[]> {
   const db = getAdminClient();
 
   const { data: plans } = await db
     .from("membership_plans")
     .select("id, name, slug, description")
+    .eq("tenant_id", tenantId)
     .eq("is_active", true);
 
   if (!plans?.length) return [];
@@ -47,11 +48,13 @@ export async function listMembershipPlans(): Promise<MembershipPlanSummary[]> {
     db
       .from("membership_plan_pricing")
       .select("id, plan_id, billing_frequency, price_cents")
+      .eq("tenant_id", tenantId)
       .in("plan_id", planIds)
       .eq("is_active", true),
     db
       .from("membership_entitlements")
       .select("id, plan_id, service_type_id, service_package_id, included_uses_per_period, period, is_priority_scheduling, benefit_description, service_types(name)")
+      .eq("tenant_id", tenantId)
       .in("plan_id", planIds),
   ]);
 
@@ -80,9 +83,4 @@ export async function listMembershipPlans(): Promise<MembershipPlanSummary[]> {
         benefitDescription: r.benefit_description,
       })),
   }));
-}
-
-export async function getMembershipPlanBySlug(slug: string): Promise<MembershipPlanSummary | null> {
-  const plans = await listMembershipPlans();
-  return plans.find((p) => p.slug === slug) ?? null;
 }
