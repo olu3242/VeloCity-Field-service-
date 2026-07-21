@@ -3,9 +3,11 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { isRuntimePaused } from "@/lib/governance/operator";
 import { routeAutomationEvent } from "./router";
 import type { AutomationQueueRow } from "./types";
+import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
 
 const BASE_RETRY_DELAY_MS = 60_000;
 const MAX_RETRY_DELAY_MS = 15 * 60_000;
+const MAX_RETRIES = 3;
 
 // Exponential backoff with full jitter (1, 2, 4 min base, randomized) —
 // replaces the prior linear (1/2/3 min) schedule so retries spread out
@@ -89,13 +91,29 @@ export async function processAutomationQueue(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const retryCount = Number(row.retry_count ?? 0) + 1;
+      const exhausted = retryCount >= MAX_RETRIES;
+
       await client.from("automation_queue").update({
-        status: retryCount >= 3 ? "failed" : "pending",
+        status: exhausted ? "failed" : "pending",
         retry_count: retryCount,
         error_message: message,
         available_at: new Date(Date.now() + retryDelayMs(retryCount)).toISOString(),
-        processed_at: retryCount >= 3 ? new Date().toISOString() : null,
+        processed_at: exhausted ? new Date().toISOString() : null,
       }).eq("id", row.id);
+
+      if (exhausted) {
+        // Move to dead letter queue so ops can inspect and manually resolve
+        // without losing the original event data.
+        await client.from("automation_dead_letters").insert({
+          tenant_id: row.tenant_id ?? DEFAULT_TENANT_ID,
+          original_queue_id: row.id,
+          event_type: row.event_type,
+          payload: row.payload ?? {},
+          error_message: message,
+          retry_count: retryCount,
+        });
+      }
+
       if (run?.id) {
         await client.from("automation_runs").update({
           status: "failed",
