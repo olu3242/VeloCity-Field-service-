@@ -26,6 +26,7 @@ import { handleSLACheck } from "./handlers/sla-check";
 import { handleTipSubmitted } from "./handlers/tip-submitted";
 import { handleMembershipLifecycle } from "./handlers/membership-lifecycle";
 import { handleFranchiseLifecycle } from "./handlers/franchise-lifecycle";
+import { handlePredictiveSignals } from "./handlers/predictive-signals";
 
 // ── Build a synthetic queue item for handlers that need one ──────────────
 function syntheticQueueItem(eventType: AutomationEventType, payload: AutomationPayload): AutomationQueueItem {
@@ -234,7 +235,6 @@ export async function routeAutomationEvent(
       case "surge_pricing_recommended":
       case "recurring_service_opportunity_detected":
       case "provider_subscription_opportunity_detected":
-      case "customer_churn_risk_detected":
       case "territory_ready_for_expansion":
       case "franchise_candidate_area_detected": {
         actions.push("tess-territory");
@@ -282,6 +282,16 @@ export async function routeAutomationEvent(
         actions.push("franchise-lifecycle");
         const result = await callIfEnabled("franchise-lifecycle", () => handleFranchiseLifecycle(typedPayload, queueItem));
         output.franchise = result;
+        break;
+      }
+
+      // ── Predictive Intelligence Signals ──────────────────────────────────
+      case "customer_churn_risk_detected":
+      case "membership_renewal_due":
+      case "provider_at_risk_detected": {
+        actions.push("predictive-signals");
+        const result = await callIfEnabled("predictive-signals", () => handlePredictiveSignals(typedPayload, queueItem));
+        output.predictive = result;
         break;
       }
 
