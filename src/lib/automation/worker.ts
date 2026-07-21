@@ -8,6 +8,7 @@ import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
 const BASE_RETRY_DELAY_MS = 60_000;
 const MAX_RETRY_DELAY_MS = 15 * 60_000;
 const MAX_RETRIES = 3;
+const PROCESSING_TIMEOUT_MS = 10 * 60_000; // 10 minutes
 
 // Exponential backoff with full jitter (1, 2, 4 min base, randomized) —
 // replaces the prior linear (1/2/3 min) schedule so retries spread out
@@ -26,6 +27,31 @@ export interface AutomationWorkerResult {
   errors: Array<{ queueId: string; message: string }>;
 }
 
+/**
+ * Reset any rows that have been stuck in "processing" for longer than
+ * PROCESSING_TIMEOUT_MS. This guards against worker crashes that leave rows
+ * indefinitely locked, which would silently block replay for those events.
+ */
+async function resetTimedOutRows(client: SupabaseClient): Promise<number> {
+  const cutoff = new Date(Date.now() - PROCESSING_TIMEOUT_MS).toISOString();
+  const { data, error } = await client
+    .from("automation_queue")
+    .update({
+      status: "failed",
+      error_message: "Processing timeout",
+      processed_at: new Date().toISOString(),
+    })
+    .eq("status", "processing")
+    .lt("updated_at", cutoff)
+    .select("id");
+
+  if (error) {
+    console.error("[worker] timeout cleanup error:", error.message);
+    return 0;
+  }
+  return data?.length ?? 0;
+}
+
 export async function processAutomationQueue(
   supabase?: SupabaseClient,
   limit = 10,
@@ -39,6 +65,10 @@ export async function processAutomationQueue(
   if (isRuntimePaused()) {
     return { ...result, skipped: limit };
   }
+
+  // Cleanup: reset rows stuck in "processing" beyond the timeout threshold
+  // before fetching the next batch so they can be retried this run.
+  await resetTimedOutRows(client);
 
   let query = client
     .from("automation_queue")
@@ -56,6 +86,42 @@ export async function processAutomationQueue(
 
   for (const row of (rows ?? []) as AutomationQueueRow[]) {
     result.processed += 1;
+
+    // Idempotency check: if the same logical event (same event_id) already has
+    // another queue row that is "processing" or "completed", skip this one to
+    // prevent duplicate execution when events are re-queued via replay.
+    if (row.event_id) {
+      const { data: duplicates } = await client
+        .from("automation_queue")
+        .select("id, status")
+        .eq("event_id", row.event_id)
+        .in("status", ["processing", "completed"])
+        .neq("id", row.id)
+        .limit(1);
+
+      if (duplicates && duplicates.length > 0) {
+        const dup = duplicates[0] as { id: string; status: string };
+
+        if (dup.status === "completed") {
+          // The event was already processed successfully by another queue row.
+          // Mark this row completed with a note so it doesn't block the queue.
+          await client.from("automation_queue").update({
+            status: "completed",
+            processed_at: new Date().toISOString(),
+            error_message: `Skipped: event already completed by queue row ${dup.id}`,
+          }).eq("id", row.id);
+          result.completed += 1;
+          result.skipped += 1;
+        } else {
+          // Another row is currently "processing" the same event. Leave this
+          // row as pending — it will be re-evaluated on the next worker run,
+          // at which point the other row will have either completed or timed out.
+          result.skipped += 1;
+        }
+        continue;
+      }
+    }
+
     const startedAt = new Date().toISOString();
     await client.from("automation_queue").update({ status: "processing", error_message: null }).eq("id", row.id);
     const { data: run } = await client
@@ -126,6 +192,6 @@ export async function processAutomationQueue(
     }
   }
 
-  result.skipped = Math.max(0, limit - result.processed);
+  result.skipped = Math.max(result.skipped, limit - result.processed);
   return result;
 }

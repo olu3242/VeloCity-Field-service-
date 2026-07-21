@@ -77,6 +77,9 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 // Middleware
 // ---------------------------------------------------------------------------
 export async function middleware(request: NextRequest) {
+  // Capture start time for X-Response-Time header
+  const startTime = Date.now();
+
   const { pathname } = request.nextUrl;
 
   // Skip middleware entirely if Supabase is not configured
@@ -85,18 +88,25 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder")
   ) {
     const res = NextResponse.next({ request });
-    return applySecurityHeaders(res);
+    applySecurityHeaders(res);
+    res.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+    return res;
   }
 
   // ------------------------------------------------------------------
   // Rate limiting — only for /api/* routes
+  // Tenant-aware: uses x-tenant-id header when present, falls back to IP.
   // ------------------------------------------------------------------
   const bucket = getRateLimitBucket(pathname);
   if (bucket) {
+    const tenantHeader = request.headers.get("x-tenant-id")?.trim();
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
       "unknown";
-    const key = `${ip}:${pathname}`;
+    const rateLimitIdentifier = tenantHeader
+      ? `tenant:${tenantHeader}`
+      : ip;
+    const key = `${rateLimitIdentifier}:${pathname}`;
     const allowed = checkRateLimit(key, bucket);
 
     if (!allowed) {
@@ -110,7 +120,9 @@ export async function middleware(request: NextRequest) {
           },
         }
       );
-      return applySecurityHeaders(tooManyRes);
+      applySecurityHeaders(tooManyRes);
+      tooManyRes.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+      return tooManyRes;
     }
   }
 
@@ -164,7 +176,9 @@ export async function middleware(request: NextRequest) {
     const redirectRes = NextResponse.redirect(
       new URL("/auth/login", request.url)
     );
-    return applySecurityHeaders(redirectRes);
+    applySecurityHeaders(redirectRes);
+    redirectRes.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+    return redirectRes;
   }
 
   // Role-gate each portal
@@ -190,13 +204,17 @@ export async function middleware(request: NextRequest) {
       const redirectRes = NextResponse.redirect(
         new URL("/dashboard", request.url)
       );
-      return applySecurityHeaders(redirectRes);
+      applySecurityHeaders(redirectRes);
+      redirectRes.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+      return redirectRes;
     }
     if (pathname.startsWith("/provider") && role !== "provider") {
       const redirectRes = NextResponse.redirect(
         new URL("/dashboard", request.url)
       );
-      return applySecurityHeaders(redirectRes);
+      applySecurityHeaders(redirectRes);
+      redirectRes.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+      return redirectRes;
     }
     if (
       pathname.startsWith("/dispatch") &&
@@ -207,7 +225,9 @@ export async function middleware(request: NextRequest) {
       const redirectRes = NextResponse.redirect(
         new URL("/dashboard", request.url)
       );
-      return applySecurityHeaders(redirectRes);
+      applySecurityHeaders(redirectRes);
+      redirectRes.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+      return redirectRes;
     }
     if (
       pathname.startsWith("/franchise") &&
@@ -218,7 +238,9 @@ export async function middleware(request: NextRequest) {
       const redirectRes = NextResponse.redirect(
         new URL("/dashboard", request.url)
       );
-      return applySecurityHeaders(redirectRes);
+      applySecurityHeaders(redirectRes);
+      redirectRes.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+      return redirectRes;
     }
   }
 
@@ -231,10 +253,14 @@ export async function middleware(request: NextRequest) {
     const redirectRes = NextResponse.redirect(
       new URL("/dashboard", request.url)
     );
-    return applySecurityHeaders(redirectRes);
+    applySecurityHeaders(redirectRes);
+    redirectRes.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+    return redirectRes;
   }
 
-  return applySecurityHeaders(supabaseResponse);
+  applySecurityHeaders(supabaseResponse);
+  supabaseResponse.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+  return supabaseResponse;
 }
 
 export const config = {
