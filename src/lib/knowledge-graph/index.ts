@@ -151,3 +151,79 @@ export async function buildGraphSummary(tenantId: string): Promise<GraphSummary>
 
   return { nodeCount, edgeCount, nodesByType, mostConnected };
 }
+
+// Build a graph centered on a provider: jobs assigned, customers served, territory coverage
+export async function buildProviderGraph(tenantId: string, providerId: string): Promise<EntityGraph> {
+  const db = getAdminClient();
+  const { data: provider } = await db.from("providers").select("id, business_name, user_id, zip_codes").eq("id", providerId).single();
+
+  const providerNode: GraphNode = {
+    type: "provider",
+    id: providerId,
+    label: (provider?.business_name as string | null) ?? "Provider",
+  };
+  const nodes: GraphNode[] = [providerNode];
+  const edges: GraphEdge[] = [];
+
+  const [jobsResult, disputesResult, skillsResult] = await Promise.all([
+    db.from("jobs").select("id, title, status, customer_id").eq("provider_id", providerId).eq("tenant_id", tenantId).limit(5),
+    db.from("disputes").select("id, reason, status").eq("provider_id", providerId).limit(3),
+    db.from("provider_skills").select("id, service_type_id").eq("provider_id", providerId).limit(5),
+  ]);
+
+  for (const job of jobsResult.data ?? []) {
+    const jobNode: GraphNode = { type: "job", id: job.id, label: (job.title as string | null) ?? `Job ${job.id.slice(0, 8)}`, properties: { status: job.status } };
+    nodes.push(jobNode);
+    edges.push({ from: providerNode, relationship: "assigned_to", to: jobNode });
+  }
+
+  for (const dispute of disputesResult.data ?? []) {
+    const disputeNode: GraphNode = { type: "dispute", id: dispute.id, label: `Dispute: ${String(dispute.reason ?? "unknown").slice(0, 30)}` };
+    nodes.push(disputeNode);
+    edges.push({ from: disputeNode, relationship: "linked_to", to: providerNode });
+  }
+
+  return { nodes, edges, centerNode: providerNode };
+}
+
+// Search across entity types by label fragment
+export async function searchGraph(tenantId: string, query: string, limit = 10): Promise<GraphNode[]> {
+  const db = getAdminClient();
+  const q = query.toLowerCase();
+
+  const [customersResult, providersResult, jobsResult] = await Promise.all([
+    db.from("profiles").select("id, full_name, email").eq("tenant_id", tenantId).eq("role", "customer").ilike("full_name", `%${q}%`).limit(limit),
+    db.from("providers").select("id, business_name").eq("tenant_id", tenantId).ilike("business_name", `%${q}%`).limit(limit),
+    db.from("jobs").select("id, title, status").eq("tenant_id", tenantId).ilike("title", `%${q}%`).limit(limit),
+  ]);
+
+  const results: GraphNode[] = [];
+  for (const c of customersResult.data ?? []) {
+    results.push({ type: "customer", id: c.id, label: (c.full_name as string | null) ?? (c.email as string | null) ?? "Customer" });
+  }
+  for (const p of providersResult.data ?? []) {
+    results.push({ type: "provider", id: p.id, label: (p.business_name as string | null) ?? "Provider" });
+  }
+  for (const j of jobsResult.data ?? []) {
+    results.push({ type: "job", id: j.id, label: (j.title as string | null) ?? `Job ${j.id.slice(0, 8)}`, properties: { status: j.status } });
+  }
+
+  return results.slice(0, limit);
+}
+
+// Generic entry point — routes to the right builder
+export async function buildEntityGraph(tenantId: string, entityType: NodeType, entityId: string): Promise<EntityGraph> {
+  switch (entityType) {
+    case "customer": return buildCustomerGraph(tenantId, entityId);
+    case "job": return buildJobGraph(tenantId, entityId);
+    case "provider": return buildProviderGraph(tenantId, entityId);
+    default: {
+      const summary = await buildGraphSummary(tenantId);
+      return {
+        nodes: summary.mostConnected,
+        edges: [],
+        centerNode: { type: entityType, id: entityId, label: entityId.slice(0, 8) },
+      };
+    }
+  }
+}

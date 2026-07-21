@@ -2,6 +2,7 @@
 
 import { getAdminClient } from "@/lib/supabase/admin";
 import { runAgent } from "@/lib/agents/runAgent";
+import { storeEnterpriseMemory } from "@/lib/enterprise-memory";
 import type {
   AutomationPayload,
   AutomationQueueItem,
@@ -129,6 +130,19 @@ export async function handleIvyDispute(
         metadata: { job_id, dispute_id, resolution },
       });
     }
+
+    await storeEnterpriseMemory({
+      tenantId: (payload as unknown as Record<string, string>).tenant_id ?? "default",
+      category: "outcome",
+      entityType: "dispute",
+      entityId: dispute_id,
+      actorType: "agent",
+      actorId: "ivy",
+      summary: `Dispute ${dispute_id} resolved: ${resolution?.replace(/_/g, " ")}`,
+      detail: { job_id, dispute_id, resolution, payout_released: resolution === "resolved_for_provider" },
+      tags: ["dispute", "resolution", resolution ?? "unknown"],
+      importance: "normal",
+    });
 
     return { success: true, output: { job_id, dispute_id, resolution, payout_released: resolution === "resolved_for_provider" } };
   }

@@ -13,7 +13,11 @@ export type ScenarioType =
   | "provider_surge"
   | "customer_churn"
   | "seasonal_spike"
-  | "contract_loss";
+  | "contract_loss"
+  | "sla_degradation"
+  | "revenue_growth_plan"
+  | "supplier_disruption"
+  | "workforce_expansion";
 
 export interface ScenarioParams {
   type: ScenarioType;
@@ -32,6 +36,12 @@ export interface SimulationResult {
     confidence: number;
   };
   recommendation: string;
+  financialProjection: {
+    estimatedRevenueDeltaCents: number;
+    estimatedCostDeltaCents: number;
+    netImpactCents: number;
+    paybackPeriodDays: number | null;
+  };
 }
 
 export async function syncDigitalTwin(tenantId: string): Promise<TwinState> {
@@ -86,6 +96,14 @@ function projectScenario(baseline: TwinState, params: ScenarioParams): TwinState
       return { ...baseline, queueDepth: Math.round(baseline.queueDepth * (1 + m * 2)), aiCallsPerMinute: Math.round(baseline.aiCallsPerMinute * (1 + m)), timestamp: new Date().toISOString() };
     case "contract_loss":
       return { ...baseline, payoutPendingCents: Math.round(baseline.payoutPendingCents * (1 - m * 0.5)), timestamp: new Date().toISOString() };
+    case "sla_degradation":
+      return { ...baseline, queueDepth: Math.round(baseline.queueDepth * (1 + m * 1.5)), aiCallsPerMinute: Math.round(baseline.aiCallsPerMinute * (1 + m * 0.8)), timestamp: new Date().toISOString() };
+    case "revenue_growth_plan":
+      return { ...baseline, activeProviders: Math.round(baseline.activeProviders * (1 + m * 0.4)), queueDepth: Math.round(baseline.queueDepth * (1 + m * 0.6)), timestamp: new Date().toISOString() };
+    case "supplier_disruption":
+      return { ...baseline, queueDepth: Math.round(baseline.queueDepth * (1 + m * 0.7)), disputeOpenCount: Math.round(baseline.disputeOpenCount * (1 + m * 0.5)), timestamp: new Date().toISOString() };
+    case "workforce_expansion":
+      return { ...baseline, activeProviders: Math.round(baseline.activeProviders * (1 + m * 0.8)), queueDepth: Math.round(baseline.queueDepth * (1 - m * 0.4)), timestamp: new Date().toISOString() };
     default:
       return { ...baseline, timestamp: new Date().toISOString() };
   }
@@ -98,7 +116,42 @@ const SCENARIO_RECOMMENDATIONS: Record<ScenarioType, string> = {
   customer_churn: "Revenue decline modeled; activate retention campaigns before churn exceeds 20%",
   seasonal_spike: "Pre-scale queue workers and AI call capacity 2 weeks ahead of peak demand",
   contract_loss: "Payout obligations decrease but GMV drops — identify replacement accounts in pipeline",
+  sla_degradation: "Add queue workers and increase AI call capacity; activate SLA escalation playbook",
+  revenue_growth_plan: "Scale provider recruitment 90 days ahead; expand automation capacity proportionally",
+  supplier_disruption: "Activate backup supplier routing; flag affected jobs for manual review",
+  workforce_expansion: "Onboard providers in batches of 10; monitor acceptance rates weekly",
 };
+
+function computeFinancialProjection(params: ScenarioParams, baseline: TwinState): SimulationResult["financialProjection"] {
+  const m = params.magnitude;
+  const baseRevPerJob = 15000; // $150 avg job value
+  const providerRevPerMonth = baseline.activeProviders * baseRevPerJob * 4; // ~4 jobs/provider/month
+
+  switch (params.type) {
+    case "territory_expansion":
+      return { estimatedRevenueDeltaCents: Math.round(providerRevPerMonth * m * 0.3), estimatedCostDeltaCents: Math.round(50000 * m * 100), netImpactCents: Math.round(providerRevPerMonth * m * 0.3 - 50000 * m * 100), paybackPeriodDays: 90 };
+    case "pricing_increase":
+      return { estimatedRevenueDeltaCents: Math.round(providerRevPerMonth * m * 0.15), estimatedCostDeltaCents: 0, netImpactCents: Math.round(providerRevPerMonth * m * 0.15), paybackPeriodDays: 30 };
+    case "provider_surge":
+      return { estimatedRevenueDeltaCents: Math.round(providerRevPerMonth * m * 0.8), estimatedCostDeltaCents: Math.round(25000 * m * 100), netImpactCents: Math.round(providerRevPerMonth * m * 0.8 - 25000 * m * 100), paybackPeriodDays: 60 };
+    case "customer_churn":
+      return { estimatedRevenueDeltaCents: -Math.round(providerRevPerMonth * m * 0.4), estimatedCostDeltaCents: 0, netImpactCents: -Math.round(providerRevPerMonth * m * 0.4), paybackPeriodDays: null };
+    case "seasonal_spike":
+      return { estimatedRevenueDeltaCents: Math.round(providerRevPerMonth * m * 1.2), estimatedCostDeltaCents: Math.round(10000 * m * 100), netImpactCents: Math.round(providerRevPerMonth * m * 1.2 - 10000 * m * 100), paybackPeriodDays: 0 };
+    case "contract_loss":
+      return { estimatedRevenueDeltaCents: -Math.round(500000 * m * 100), estimatedCostDeltaCents: 0, netImpactCents: -Math.round(500000 * m * 100), paybackPeriodDays: null };
+    case "sla_degradation":
+      return { estimatedRevenueDeltaCents: -Math.round(providerRevPerMonth * m * 0.1), estimatedCostDeltaCents: Math.round(5000 * m * 100), netImpactCents: -Math.round(providerRevPerMonth * m * 0.1 + 5000 * m * 100), paybackPeriodDays: null };
+    case "revenue_growth_plan":
+      return { estimatedRevenueDeltaCents: Math.round(providerRevPerMonth * m * 0.5), estimatedCostDeltaCents: Math.round(30000 * m * 100), netImpactCents: Math.round(providerRevPerMonth * m * 0.5 - 30000 * m * 100), paybackPeriodDays: 120 };
+    case "supplier_disruption":
+      return { estimatedRevenueDeltaCents: -Math.round(providerRevPerMonth * m * 0.05), estimatedCostDeltaCents: Math.round(8000 * m * 100), netImpactCents: -Math.round(providerRevPerMonth * m * 0.05 + 8000 * m * 100), paybackPeriodDays: null };
+    case "workforce_expansion":
+      return { estimatedRevenueDeltaCents: Math.round(providerRevPerMonth * m * 0.7), estimatedCostDeltaCents: Math.round(20000 * m * 100), netImpactCents: Math.round(providerRevPerMonth * m * 0.7 - 20000 * m * 100), paybackPeriodDays: 75 };
+    default:
+      return { estimatedRevenueDeltaCents: 0, estimatedCostDeltaCents: 0, netImpactCents: 0, paybackPeriodDays: null };
+  }
+}
 
 export function runSimulation(baseline: TwinState, params: ScenarioParams): SimulationResult {
   const projected = projectScenario(baseline, params);
@@ -118,5 +171,6 @@ export function runSimulation(baseline: TwinState, params: ScenarioParams): Simu
       confidence: Math.round(70 + (1 - params.magnitude) * 20),
     },
     recommendation: SCENARIO_RECOMMENDATIONS[params.type] ?? "Review scenario parameters and re-run simulation",
+    financialProjection: computeFinancialProjection(params, baseline),
   };
 }

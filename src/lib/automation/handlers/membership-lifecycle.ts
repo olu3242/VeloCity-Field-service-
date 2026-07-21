@@ -8,6 +8,7 @@
 import { getAdminClient } from "@/lib/supabase/admin";
 import { alice } from "@/lib/agents/alice";
 import { nova } from "@/lib/agents/nova";
+import { storeEnterpriseMemory } from "@/lib/enterprise-memory";
 import type { AutomationPayload, AutomationQueueItem, HandlerResult } from "@/types/automation";
 
 export async function handleMembershipLifecycle(
@@ -38,6 +39,18 @@ export async function handleMembershipLifecycle(
         metadata: { membership_subscription_id, automation_action: action.action },
       });
     }
+    await storeEnterpriseMemory({
+      tenantId: tenant_id,
+      category: "outcome",
+      entityType: "membership",
+      entityId: membership_subscription_id,
+      actorType: "agent",
+      actorId: "alice",
+      summary: `Membership ${item.event_type.replace(/_/g, " ")} for subscription ${membership_subscription_id}`,
+      detail: { event: item.event_type, workflows_triggered: relevant.length, customer_id: customer_id ?? null },
+      tags: ["membership", item.event_type, "lifecycle"],
+      importance: item.event_type === "membership_cancelled" ? "high" : "normal",
+    });
     return { success: true, output: { event: item.event_type, workflows_triggered: relevant.length } };
   }
 

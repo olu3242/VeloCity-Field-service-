@@ -9,6 +9,11 @@ import { computeRecurringRevenueIntelligence } from "@/lib/membership/membership
 import { computeMembershipRetentionIntelligence } from "@/lib/membership/membershipRetentionIntelligence";
 import { getAllCircuits } from "@/lib/governance/circuit-breaker";
 import { storeEnterpriseMemory } from "@/lib/enterprise-memory";
+import { computeProviderGrowthIntelligence } from "@/lib/growth/providerGrowthIntelligence";
+import { calculateCityReadinessScore } from "@/lib/expansion/cityReadinessScore";
+import { calculateTerritoryOpportunityScore } from "@/lib/expansion/territoryOpportunityScore";
+import { forecastSlaRisk } from "@/lib/prediction/slaForecast";
+import { computeCommercialRevenueIntelligence } from "@/lib/commercial/commercialRevenueIntelligence";
 
 export type SpecialistAgentType =
   | "executive-advisor"
@@ -18,7 +23,9 @@ export type SpecialistAgentType =
   | "compliance-agent"
   | "provider-coach"
   | "growth-strategist"
-  | "dispatch-agent";
+  | "dispatch-agent"
+  | "franchise-advisor"
+  | "commercial-advisor";
 
 export interface AgentAnalysis {
   agent: SpecialistAgentType;
@@ -170,14 +177,163 @@ async function runComplianceAgent(tenantId: string): Promise<AgentAnalysis> {
   };
 }
 
-function makeStubAgent(type: SpecialistAgentType, summary: string, recommendation: string): () => Promise<AgentAnalysis> {
-  return async () => ({
-    agent: type,
-    confidence: 70,
-    summary,
-    recommendations: [recommendation],
-    reasoning: "Extend with specialist intelligence module",
-  });
+async function runProviderCoach(tenantId: string): Promise<AgentAnalysis> {
+  const db = getAdminClient();
+  const { data: topProvider } = await db
+    .from("providers")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "approved")
+    .order("trust_score", { ascending: false })
+    .limit(1)
+    .single();
+
+  const recommendations: string[] = [];
+  if (!topProvider) {
+    recommendations.push("No approved providers found — prioritize provider onboarding");
+    return { agent: "provider-coach", confidence: 60, summary: "No providers available", recommendations, reasoning: "No approved providers in tenant" };
+  }
+
+  const report = await computeProviderGrowthIntelligence(topProvider.id);
+  if (report.revenueOpportunities.length > 0) recommendations.push(`${report.revenueOpportunities.length} revenue growth opportunities identified for top providers`);
+  if (report.pricingOpportunities.length > 0) recommendations.push(`${report.pricingOpportunities.length} pricing misalignments — review rate card`);
+  if (report.geographicExpansionOpportunities.length > 0) recommendations.push(`${report.geographicExpansionOpportunities.length} geographic expansion zones with unmet demand`);
+  if (report.expectedRevenueImpactCents > 0) recommendations.push(`Estimated $${(report.expectedRevenueImpactCents / 100).toFixed(0)} uplift from coaching opportunities`);
+  if (recommendations.length === 0) recommendations.push("Provider portfolio healthy — maintain current coaching cadence");
+
+  return {
+    agent: "provider-coach",
+    confidence: 80,
+    summary: `${report.revenueOpportunities.length} revenue opps, ${report.pricingOpportunities.length} pricing gaps, $${(report.expectedRevenueImpactCents / 100).toFixed(0)} potential uplift`,
+    recommendations,
+    reasoning: "Derived from provider growth intelligence: revenue trends, pricing benchmarks, and geographic demand gaps",
+    metadata: { expectedRevenueImpactCents: report.expectedRevenueImpactCents },
+  };
+}
+
+async function runGrowthStrategist(tenantId: string): Promise<AgentAnalysis> {
+  const db = getAdminClient();
+  const { data: territories } = await db
+    .from("franchise_territories")
+    .select("id, city, state, provider_count, active_customers, monthly_revenue_cents")
+    .eq("tenant_id", tenantId)
+    .limit(10);
+
+  const recommendations: string[] = [];
+  if (!territories || territories.length === 0) {
+    recommendations.push("No franchise territories configured — define service territories to unlock expansion intelligence");
+    return { agent: "growth-strategist", confidence: 60, summary: "No territories configured", recommendations, reasoning: "No franchise_territories rows for tenant" };
+  }
+
+  let highOpportunityCount = 0;
+  for (const t of territories) {
+    const readiness = calculateCityReadinessScore({
+      demandIndex: Math.min(100, (t.active_customers as number ?? 0) * 2),
+      providerCount: t.provider_count as number ?? 0,
+      activeCustomers: t.active_customers as number ?? 0,
+      monthlyRevenueCents: t.monthly_revenue_cents as number ?? 0,
+    });
+    const opportunity = calculateTerritoryOpportunityScore({
+      demandIndex: Math.min(100, (t.active_customers as number ?? 0) * 2),
+      providerGap: Math.max(0, 10 - (t.provider_count as number ?? 0)),
+    });
+    if (readiness.score >= 70 && opportunity.score >= 60) highOpportunityCount++;
+  }
+
+  if (highOpportunityCount > 0) recommendations.push(`${highOpportunityCount} territories show high readiness + opportunity for expansion`);
+  if (territories.length < 3) recommendations.push("Fewer than 3 territories configured — consider multi-market expansion");
+  const totalRevenue = territories.reduce((s, t) => s + ((t.monthly_revenue_cents as number) ?? 0), 0);
+  if (totalRevenue > 0) recommendations.push(`Combined territory MRR $${(totalRevenue / 100).toFixed(0)} — benchmark against expansion cost models`);
+  if (recommendations.length === 0) recommendations.push("Territory portfolio stable — monitor supply-gap signals for next expansion wave");
+
+  return {
+    agent: "growth-strategist",
+    confidence: 78,
+    summary: `${territories.length} territories, ${highOpportunityCount} high-opportunity, $${(territories.reduce((s, t) => s + ((t.monthly_revenue_cents as number) ?? 0), 0) / 100).toFixed(0)} MRR`,
+    recommendations,
+    reasoning: "Derived from city readiness and territory opportunity scoring across franchise territories",
+    metadata: { territoryCount: territories.length, highOpportunityCount },
+  };
+}
+
+async function runDispatchAgent(tenantId: string): Promise<AgentAnalysis> {
+  const db = getAdminClient();
+  const [openJobsResult, providersResult, emergencyResult] = await Promise.all([
+    db.from("jobs").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).in("status", ["pending", "searching"]),
+    db.from("providers").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "approved"),
+    db.from("jobs").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("urgency", "emergency").in("status", ["pending", "searching"]),
+  ]);
+
+  const openJobs = openJobsResult.count ?? 0;
+  const activeProviders = providersResult.count ?? 0;
+  const emergencyJobs = emergencyResult.count ?? 0;
+
+  const forecast = forecastSlaRisk({ openJobs, activeProviders, emergencyJobs });
+  const recommendations: string[] = [];
+  if (forecast.breachRisk === "high") recommendations.push(`SLA breach risk HIGH (score ${forecast.riskScore}) — surge routing needed immediately`);
+  else if (forecast.breachRisk === "medium") recommendations.push(`SLA breach risk MEDIUM (score ${forecast.riskScore}) — monitor dispatch queue`);
+  if (emergencyJobs > 0) recommendations.push(`${emergencyJobs} emergency jobs in queue — prioritize provider matching`);
+  if (activeProviders === 0) recommendations.push("No active providers — dispatch completely blocked");
+  if (openJobs > activeProviders * 3) recommendations.push(`Queue depth ${openJobs} vs ${activeProviders} providers — acceptance rate at risk`);
+  if (recommendations.length === 0) recommendations.push("Dispatch queue balanced — SLA risk within acceptable range");
+
+  return {
+    agent: "dispatch-agent",
+    confidence: 83,
+    summary: `${openJobs} open jobs, ${activeProviders} providers, ${emergencyJobs} emergency, SLA risk ${forecast.breachRisk}`,
+    recommendations,
+    reasoning: "Derived from live dispatch queue depth, provider availability, and SLA risk forecast",
+    metadata: { openJobs, activeProviders, emergencyJobs, slaRiskScore: forecast.riskScore, breachRisk: forecast.breachRisk },
+  };
+}
+
+async function runFranchiseAdvisor(tenantId: string): Promise<AgentAnalysis> {
+  const db = getAdminClient();
+  const [territoriesResult, operatorsResult] = await Promise.all([
+    db.from("franchise_territories").select("id, city, state, status, monthly_revenue_cents").eq("tenant_id", tenantId),
+    db.from("territory_operators").select("territory_id, status").eq("tenant_id", tenantId),
+  ]);
+
+  const territories = territoriesResult.data ?? [];
+  const operators = operatorsResult.data ?? [];
+  const unmanned = territories.filter(t => !operators.some((o: { territory_id: string; status: string }) => o.territory_id === t.id && o.status === "active"));
+  const totalRevenue = territories.reduce((s, t) => s + ((t.monthly_revenue_cents as number) ?? 0), 0);
+
+  const recommendations: string[] = [];
+  if (unmanned.length > 0) recommendations.push(`${unmanned.length} territories without active operators — assign franchise leads`);
+  if (territories.length === 0) recommendations.push("No franchise territories — configure territories to enable franchise intelligence");
+  if (totalRevenue > 0 && territories.length > 0) {
+    const avgRevenue = totalRevenue / territories.length;
+    if (avgRevenue < 50000_00) recommendations.push(`Average territory MRR $${(avgRevenue / 100).toFixed(0)} below $50k target — accelerate territory activation`);
+  }
+  if (recommendations.length === 0) recommendations.push("Franchise portfolio healthy — all territories operational");
+
+  return {
+    agent: "franchise-advisor",
+    confidence: 74,
+    summary: `${territories.length} territories, ${unmanned.length} unmanned, $${(totalRevenue / 100).toFixed(0)} total MRR`,
+    recommendations,
+    reasoning: "Derived from franchise_territories and territory_operators coverage analysis",
+    metadata: { territoryCount: territories.length, unmannedCount: unmanned.length, totalRevenueCents: totalRevenue },
+  };
+}
+
+async function runCommercialAdvisor(tenantId: string): Promise<AgentAnalysis> {
+  const report = await computeCommercialRevenueIntelligence(tenantId);
+  const recommendations: string[] = [];
+  if (report.atRiskContracts.length > 0) recommendations.push(`${report.atRiskContracts.length} commercial contracts at risk — schedule executive reviews`);
+  if (report.renewalPipeline.length > 0) recommendations.push(`${report.renewalPipeline.length} contracts up for renewal — initiate renewal outreach`);
+  if (report.totalCommercialRevenueCents < report.activeContractValueCents * 0.7) recommendations.push("Commercial revenue significantly below contracted value — investigate attainment gaps");
+  if (recommendations.length === 0) recommendations.push("Commercial portfolio on track — maintain account health cadence");
+
+  return {
+    agent: "commercial-advisor",
+    confidence: 81,
+    summary: `$${(report.totalCommercialRevenueCents / 100).toFixed(0)} commercial revenue, ${report.atRiskContracts.length} at-risk, ${report.renewalPipeline.length} renewals pending`,
+    recommendations,
+    reasoning: "Derived from commercial revenue intelligence: contract attainment, at-risk contracts, and renewal pipeline",
+    metadata: { totalCommercialRevenueCents: report.totalCommercialRevenueCents, atRiskCount: report.atRiskContracts.length },
+  };
 }
 
 const AGENT_RUNNERS: Record<SpecialistAgentType, (tenantId: string) => Promise<AgentAnalysis>> = {
@@ -186,9 +342,11 @@ const AGENT_RUNNERS: Record<SpecialistAgentType, (tenantId: string) => Promise<A
   "finance-agent": runFinanceAgent,
   "risk-analyst": runRiskAnalyst,
   "compliance-agent": runComplianceAgent,
-  "provider-coach": makeStubAgent("provider-coach", "Provider performance metrics nominal", "Review provider scoring weekly via Rex completion intelligence"),
-  "growth-strategist": makeStubAgent("growth-strategist", "Territory expansion signals pending sweep", "Run TESS territory analysis for expansion recommendations"),
-  "dispatch-agent": makeStubAgent("dispatch-agent", "Dispatch queue operational", "Monitor provider acceptance rate and response time SLAs"),
+  "provider-coach": runProviderCoach,
+  "growth-strategist": runGrowthStrategist,
+  "dispatch-agent": runDispatchAgent,
+  "franchise-advisor": runFranchiseAdvisor,
+  "commercial-advisor": runCommercialAdvisor,
 };
 
 export async function coordinateAgents(
@@ -231,5 +389,5 @@ export async function coordinateAgents(
 export const ALL_SPECIALIST_AGENTS: SpecialistAgentType[] = [
   "executive-advisor", "customer-success", "finance-agent",
   "risk-analyst", "compliance-agent", "provider-coach",
-  "growth-strategist", "dispatch-agent",
+  "growth-strategist", "dispatch-agent", "franchise-advisor", "commercial-advisor",
 ];
