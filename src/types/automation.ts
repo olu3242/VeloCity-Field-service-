@@ -36,7 +36,10 @@ export type AutomationEventType =
   | "membership_renewed"
   | "membership_expiring"
   | "membership_cancelled"
-  | "renewal_failed";
+  | "renewal_failed"
+  | "operator_approved"
+  | "territory_activated"
+  | "franchise_royalty_due";
 
 export type QueueStatus = "pending" | "processing" | "completed" | "failed" | "skipped";
 export type RunStatus   = "running"  | "completed" | "failed"  | "skipped";

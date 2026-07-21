@@ -25,6 +25,7 @@ import { handleProviderOffer } from "./handlers/provider-offer";
 import { handleSLACheck } from "./handlers/sla-check";
 import { handleTipSubmitted } from "./handlers/tip-submitted";
 import { handleMembershipLifecycle } from "./handlers/membership-lifecycle";
+import { handleFranchiseLifecycle } from "./handlers/franchise-lifecycle";
 
 // ── Build a synthetic queue item for handlers that need one ──────────────
 function syntheticQueueItem(eventType: AutomationEventType, payload: AutomationPayload): AutomationQueueItem {
@@ -271,6 +272,16 @@ export async function routeAutomationEvent(
         actions.push("tip-submitted");
         const result = await callIfEnabled("tip-submitted", () => handleTipSubmitted(typedPayload, queueItem));
         output.tip = result;
+        break;
+      }
+
+      // ── Franchise Lifecycle ───────────────────────────────────────────────
+      case "operator_approved":
+      case "territory_activated":
+      case "franchise_royalty_due": {
+        actions.push("franchise-lifecycle");
+        const result = await callIfEnabled("franchise-lifecycle", () => handleFranchiseLifecycle(typedPayload, queueItem));
+        output.franchise = result;
         break;
       }
 

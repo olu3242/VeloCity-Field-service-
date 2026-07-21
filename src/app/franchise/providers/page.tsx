@@ -103,6 +103,9 @@ export default async function FranchiseProvidersPage() {
             <Link href="/franchise/territory">Territory</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
+            <Link href="/franchise/jobs">Jobs</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild className="text-white/60 hover:text-white">
             <Link href="/franchise/revenue">Revenue</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild className="text-[#CCFF00]">
