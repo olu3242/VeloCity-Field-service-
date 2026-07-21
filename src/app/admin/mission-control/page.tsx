@@ -133,7 +133,7 @@ export default async function AdminMissionControlPage() {
 
   // Circuit breaker + operator state
   const circuits = getAllCircuits();
-  const openCircuits = Object.entries(circuits).filter(([, s]) => s.state === "open");
+  const openCircuits = circuits.filter(c => c.state === "open");
   const systemPaused = isRuntimePaused();
 
   return (
@@ -242,18 +242,18 @@ export default async function AdminMissionControlPage() {
                   {queueItems.length} pending
                 </span>
               </div>
-              {Object.entries(circuits).slice(0, 6).map(([name, state]) => (
-                <div key={name} className="flex items-center justify-between text-xs">
-                  <span className="text-white/40 font-mono">{name}</span>
+              {circuits.slice(0, 6).map(circuit => (
+                <div key={circuit.key} className="flex items-center justify-between text-xs">
+                  <span className="text-white/40 font-mono">{circuit.key}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-white/30">{state.failureCount} failures</span>
-                    <Badge className={circuitBadge(state.state)}>{state.state}</Badge>
+                    <span className="text-white/30">{circuit.failureCount} failures</span>
+                    <Badge className={circuitBadge(circuit.state)}>{circuit.state}</Badge>
                   </div>
                 </div>
               ))}
               {openCircuits.length > 0 && (
                 <div className="mt-2 rounded-md bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-400">
-                  ⚠ {openCircuits.length} circuit breaker{openCircuits.length !== 1 ? "s" : ""} open: {openCircuits.map(([n]) => n).join(", ")}
+                  ⚠ {openCircuits.length} circuit breaker{openCircuits.length !== 1 ? "s" : ""} open: {openCircuits.map(c => c.key).join(", ")}
                 </div>
               )}
             </CardContent>
