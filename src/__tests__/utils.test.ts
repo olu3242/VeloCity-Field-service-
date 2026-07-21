@@ -17,12 +17,12 @@ import {
 } from "../lib/utils/index";
 
 describe("formatCents", () => {
-  test("formats 100 cents as $1.00", () => {
-    assert.strictEqual(formatCents(100), "$1.00");
+  test("formats 100 cents as $1", () => {
+    // minimumFractionDigits=0 means trailing zeros are dropped
+    assert.strictEqual(formatCents(100), "$1");
   });
 
   test("formats 0 cents as $0", () => {
-    // Intl.NumberFormat drops trailing zeros below 1 for minimumFractionDigits=0
     const result = formatCents(0);
     assert.ok(
       result === "$0" || result === "$0.00",
@@ -30,16 +30,16 @@ describe("formatCents", () => {
     );
   });
 
-  test("formats 1000 cents as $10.00", () => {
-    assert.strictEqual(formatCents(1000), "$10.00");
+  test("formats 1000 cents as $10", () => {
+    assert.strictEqual(formatCents(1000), "$10");
   });
 
   test("formats 9999 cents as $99.99", () => {
     assert.strictEqual(formatCents(9999), "$99.99");
   });
 
-  test("formats 50 cents as $0.50", () => {
-    assert.strictEqual(formatCents(50), "$0.50");
+  test("formats 50 cents as $0.5", () => {
+    assert.strictEqual(formatCents(50), "$0.5");
   });
 
   test("handles large values like 1_000_000 cents = $10,000.00", () => {

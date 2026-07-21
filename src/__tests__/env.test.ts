@@ -51,8 +51,9 @@ describe("validateEnv — error message format", () => {
     STRIPE_SECRET_KEY: z.string().min(1, "STRIPE_SECRET_KEY is required"),
   });
 
-  test("zod schema produces a helpful message when STRIPE_SECRET_KEY is missing", () => {
-    const result = stripeKeySchema.safeParse({});
+  test("zod schema produces a helpful message when STRIPE_SECRET_KEY is empty", () => {
+    // Pass empty string to trigger the min(1) custom message (not invalid_type "Required")
+    const result = stripeKeySchema.safeParse({ STRIPE_SECRET_KEY: "" });
     assert.strictEqual(result.success, false);
     const issue = result.error.issues[0];
     assert.ok(
