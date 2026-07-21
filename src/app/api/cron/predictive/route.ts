@@ -8,7 +8,7 @@ import { authorizeCron } from "@/lib/cron/auth";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { createAdminClient } from "@/lib/supabase/server";
 import { computeMembershipRetentionIntelligence } from "@/lib/membership/membershipRetentionIntelligence";
-import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { DEFAULT_TENANT_ID } from "@/lib/tenancy"; // intentional: cron runs on default tenant
 
 export async function GET(request: NextRequest) {
   return runPredictiveSweep(request);

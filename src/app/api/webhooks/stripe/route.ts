@@ -5,7 +5,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 import { calculatePlatformFee } from "@/lib/utils";
 import { hasEnvGroup } from "@/lib/env";
 import { emitEvent } from "@/lib/automation/emitEvent";
-import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { getTenantIdOrDefault } from "@/lib/tenancy";
 import { generateReceipt } from "@/lib/finance/generateReceipt";
 
 export async function POST(request: NextRequest) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   switch (event.type as string) {
     case "payment_intent.succeeded": {
       const intent = event.data.object as any;
-      const tenantId = intent.metadata?.tenant_id ?? DEFAULT_TENANT_ID;
+      const tenantId = getTenantIdOrDefault(intent.metadata?.tenant_id, "stripe-webhook:intent");
 
       // Handle tip payments separately
       if (intent.metadata?.tip === "true") {
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
       await getAdminClient()
         .from("revenue_records")
         .insert({
-          tenant_id: intent.metadata?.tenant_id ?? DEFAULT_TENANT_ID,
+          tenant_id: getTenantIdOrDefault(intent.metadata?.tenant_id, "stripe-webhook:intent"),
           job_id: intent.metadata?.job_id ?? null,
           payment_id: payment?.id ?? null,
           event_type: "payment_captured",
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
 
     case "payment_intent.payment_failed": {
       const intent = event.data.object as any;
-      const tenantId = intent.metadata?.tenant_id ?? DEFAULT_TENANT_ID;
+      const tenantId = getTenantIdOrDefault(intent.metadata?.tenant_id, "stripe-webhook:intent");
       await supabase
         .from("payments")
         .update({ status: "failed" })
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
 
     case "charge.refunded": {
       const charge = event.data.object as any;
-      const tenantId = charge.metadata?.tenant_id ?? DEFAULT_TENANT_ID;
+      const tenantId = getTenantIdOrDefault(charge.metadata?.tenant_id, "stripe-webhook:charge");
       await supabase.from("refund_records").insert({
         tenant_id: tenantId,
         job_id: charge.metadata?.job_id ?? null,
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
 
     case "charge.dispute.created": {
       const dispute = event.data.object as any;
-      const tenantId = dispute.metadata?.tenant_id ?? DEFAULT_TENANT_ID;
+      const tenantId = getTenantIdOrDefault(dispute.metadata?.tenant_id, "stripe-webhook:dispute");
       await emitEvent(supabase, {
         type: "chargeback_opened",
         tenantId,
@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
 
     case "transfer.created": {
       const transfer = event.data.object as any;
-      const tenantId = transfer.metadata?.tenant_id ?? DEFAULT_TENANT_ID;
+      const tenantId = getTenantIdOrDefault(transfer.metadata?.tenant_id, "stripe-webhook:transfer");
       await supabase
         .from("payments")
         .update({
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
 
     case "transfer.failed": {
       const transfer = event.data.object as any;
-      const tenantId = transfer.metadata?.tenant_id ?? DEFAULT_TENANT_ID;
+      const tenantId = getTenantIdOrDefault(transfer.metadata?.tenant_id, "stripe-webhook:transfer");
       await emitEvent(supabase, {
         type: "payout_failed",
         tenantId,
@@ -292,7 +292,7 @@ export async function POST(request: NextRequest) {
     case "invoice.payment_succeeded":
     case "invoice.payment_failed": {
       const invoice = event.data.object as any;
-      const tenantId = invoice.metadata?.tenant_id ?? DEFAULT_TENANT_ID;
+      const tenantId = getTenantIdOrDefault(invoice.metadata?.tenant_id, "stripe-webhook:invoice");
       await supabase.from("subscription_events").insert({
         tenant_id: tenantId,
         customer_id: invoice.metadata?.customer_id ?? null,

@@ -70,7 +70,8 @@ export type AutomationEventType =
   | "provider_arrived"
   | "sla_breach_detected"
   | "stuck_job_detected"
-  | "sla_warning";
+  | "sla_warning"
+  | "review_requested";
 
 export type QueueStatus = "pending" | "processing" | "completed" | "failed" | "skipped";
 export type RunStatus   = "running"  | "completed" | "failed"  | "skipped";

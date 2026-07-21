@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "@/lib/supabase/admin";
-import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { getTenantIdOrDefault } from "@/lib/tenancy";
 import type { AutomationEventInput, AutomationEventType } from "./types";
 
 type EmitResult = { eventId?: string; queued: boolean; error?: string; duplicate?: boolean };
@@ -34,7 +34,7 @@ export async function emitEvent(
       };
 
   const payload = input.payload ?? {};
-  const tenantId = input.tenantId ?? (typeof payload.tenant_id === "string" ? payload.tenant_id : DEFAULT_TENANT_ID);
+  const tenantId = getTenantIdOrDefault(input.tenantId ?? (typeof payload.tenant_id === "string" ? payload.tenant_id : null), "emitEvent");
 
   if (input.dedupKey) {
     const { data: existing } = await supabase

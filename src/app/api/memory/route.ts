@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { getTenantId } from "@/lib/tenancy";
 import {
   retrieveMemories,
   findSimilarCases,
@@ -35,10 +35,7 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const tenantId =
-    searchParams.get("tenantId") ??
-    (profile?.tenant_id as string | null) ??
-    DEFAULT_TENANT_ID;
+  const tenantId = searchParams.get("tenantId") ?? getTenantId(profile);
 
   const category = searchParams.get("category") as MemoryCategory | null;
   const entityType = searchParams.get("entityType") ?? undefined;

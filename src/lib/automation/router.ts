@@ -3,7 +3,7 @@
 // Each handler owns its DB writes, notifications, event chaining, and agent calls.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { getTenantIdOrDefault } from "@/lib/tenancy";
 import { isAgentEnabled, isEventTypeEnabled } from "@/lib/governance/operator";
 import { isOpen, recordSuccess, recordFailure } from "@/lib/governance/circuit-breaker";
 import { routeGrowthAutomationEvent } from "./growthEvents";
@@ -76,7 +76,7 @@ export async function routeAutomationEvent(
   payload: Record<string, unknown>,
   supabase: SupabaseClient
 ): Promise<AutomationRouteResult> {
-  const tenantId = typeof payload.tenant_id === "string" ? payload.tenant_id : DEFAULT_TENANT_ID;
+  const tenantId = getTenantIdOrDefault(typeof payload.tenant_id === "string" ? payload.tenant_id : null, "routeAutomationEvent");
   const jobId = typeof payload.job_id === "string" ? payload.job_id : undefined;
   const actions: string[] = [];
   const output: Record<string, unknown> = {};

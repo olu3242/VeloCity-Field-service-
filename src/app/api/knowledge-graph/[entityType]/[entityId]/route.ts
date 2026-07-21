@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { getTenantId } from "@/lib/tenancy";
 import {
   buildCustomerGraph,
   buildJobGraph,
@@ -29,10 +29,7 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const tenantId =
-    request.nextUrl.searchParams.get("tenantId") ??
-    (profile?.tenant_id as string | null) ??
-    DEFAULT_TENANT_ID;
+  const tenantId = request.nextUrl.searchParams.get("tenantId") ?? getTenantId(profile);
 
   const { entityType, entityId } = params;
 
