@@ -3,6 +3,7 @@ import { authorizeCron } from "@/lib/cron/auth";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { processAutomationQueue } from "@/lib/automation/worker";
 import { createAdminClient } from "@/lib/supabase/server";
+import { getTenantIdOrDefault } from "@/lib/tenancy";
 
 export async function GET(request: NextRequest) {
   return runDailyIntelligence(request);
@@ -19,11 +20,12 @@ async function runDailyIntelligence(request: NextRequest) {
   const supabase = await createAdminClient();
   const day = new Date().toISOString().slice(0, 10);
   const emitted: string[] = [];
+  const tenantId = getTenantIdOrDefault(null, "cron:daily-intelligence");
 
   const [{ data: jobs }, { data: providers }, { data: serviceAreas }] = await Promise.all([
-    supabase.from("jobs").select("id,customer_id,category,city,state,status,created_at").limit(500),
-    supabase.from("providers").select("id,user_id,status,is_online,trust_score,categories").limit(500),
-    supabase.from("service_areas").select("id,name,city,state").limit(100),
+    supabase.from("jobs").select("id,customer_id,category,city,state,status,created_at").eq("tenant_id", tenantId).limit(500),
+    supabase.from("providers").select("id,user_id,status,is_online,trust_score,categories").eq("tenant_id", tenantId).limit(500),
+    supabase.from("service_areas").select("id,name,city,state").eq("tenant_id", tenantId).limit(100),
   ]);
 
   const activeJobs = (jobs ?? []).filter((job) => !["completed", "closed", "cancelled"].includes(job.status));
