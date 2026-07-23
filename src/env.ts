@@ -37,6 +37,10 @@ const serverSchema = z.object({
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+
+  // Redis / distributed runtime — optional; falls back to in-memory when absent
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof serverSchema>;
@@ -70,7 +74,9 @@ function validateEnv(): Env {
 export const env: Env = validateEnv();
 
 // Convenience: check if an optional feature group is fully configured.
-export function isFeatureConfigured(feature: "twilio" | "sendgrid" | "google-maps" | "google-oauth"): boolean {
+export function isFeatureConfigured(
+  feature: "twilio" | "sendgrid" | "google-maps" | "google-oauth" | "redis"
+): boolean {
   switch (feature) {
     case "twilio":
       return !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_PHONE_NUMBER);
@@ -80,6 +86,8 @@ export function isFeatureConfigured(feature: "twilio" | "sendgrid" | "google-map
       return !!env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     case "google-oauth":
       return !!(env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET);
+    case "redis":
+      return !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN);
     default:
       return false;
   }

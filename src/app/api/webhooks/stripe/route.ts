@@ -7,6 +7,11 @@ import { hasEnvGroup } from "@/lib/env";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantIdOrDefault } from "@/lib/tenancy";
 import { generateReceipt } from "@/lib/finance/generateReceipt";
+import {
+  checkStripeReplay,
+  beginStripeEvent,
+  completeStripeEvent,
+} from "@/lib/stripe/replay-protection";
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -25,6 +30,26 @@ export async function POST(request: NextRequest) {
     event = constructWebhookEvent(body, signature);
   } catch {
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
+  }
+
+  // ── Replay protection: skip already-processed events ─────────────────
+  const replayCheck = await checkStripeReplay(event.id);
+  if (replayCheck.isDuplicate) {
+    return NextResponse.json({
+      received: true,
+      deduplicated: true,
+      eventId: event.id,
+    });
+  }
+
+  // Acquire idempotency slot — prevents concurrent processing of same event.
+  const acquired = await beginStripeEvent(event.id);
+  if (!acquired) {
+    // Another instance is currently processing this event; Stripe will retry.
+    return NextResponse.json(
+      { error: "Event already being processed" },
+      { status: 409 }
+    );
   }
 
   const supabase = await createAdminClient();
@@ -315,5 +340,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ received: true });
+  // Mark event as successfully processed (prevents future replay).
+  await completeStripeEvent(event.id, event.type as string);
+
+  return NextResponse.json({ received: true, eventId: event.id });
 }

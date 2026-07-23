@@ -1,27 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { checkDistributedRateLimit } from "@/lib/redis/rate-limiter";
+import { childContext, encodeTraceparent, generateRequestId } from "@/lib/tracing/span";
 
 // ---------------------------------------------------------------------------
-// In-memory rate limiter — module-level singleton (per serverless instance)
-// Uses a sliding window keyed by IP + route bucket.
+// Rate limit bucket definitions
 // ---------------------------------------------------------------------------
-interface RateLimitEntry {
-  count: number;
-  windowStart: number;
-}
-
-const rateLimitStore = new Map<string, RateLimitEntry>();
-
 type RateLimitBucket = {
   windowMs: number;
   max: number;
 };
 
 function getRateLimitBucket(pathname: string): RateLimitBucket | null {
-  // Only rate-limit API routes
   if (!pathname.startsWith("/api/")) return null;
 
-  // Auth / high-value routes — tightest limit
   if (
     pathname.startsWith("/api/automation/emit") ||
     pathname.startsWith("/api/payments/")
@@ -29,30 +21,11 @@ function getRateLimitBucket(pathname: string): RateLimitBucket | null {
     return { windowMs: 60_000, max: 10 };
   }
 
-  // Stripe webhooks
   if (pathname.startsWith("/api/webhooks/")) {
     return { windowMs: 60_000, max: 30 };
   }
 
-  // General API
   return { windowMs: 60_000, max: 60 };
-}
-
-function checkRateLimit(key: string, bucket: RateLimitBucket): boolean {
-  const now = Date.now();
-  const entry = rateLimitStore.get(key);
-
-  if (!entry || now - entry.windowStart >= bucket.windowMs) {
-    // Start a fresh window
-    rateLimitStore.set(key, { count: 1, windowStart: now });
-    return true; // allowed
-  }
-
-  entry.count += 1;
-  if (entry.count > bucket.max) {
-    return false; // rate limited
-  }
-  return true; // allowed
 }
 
 // ---------------------------------------------------------------------------
@@ -94,8 +67,16 @@ export async function middleware(request: NextRequest) {
   }
 
   // ------------------------------------------------------------------
+  // Distributed trace context — inject traceparent + request ID
+  // ------------------------------------------------------------------
+  const traceCtx = childContext(request.headers.get("traceparent"));
+  const requestId = request.headers.get("x-request-id") ?? generateRequestId();
+  const traceparentValue = encodeTraceparent(traceCtx);
+
+  // ------------------------------------------------------------------
   // Rate limiting — only for /api/* routes
   // Tenant-aware: uses x-tenant-id header when present, falls back to IP.
+  // Uses distributed (Redis) sliding window with in-memory fallback.
   // ------------------------------------------------------------------
   const bucket = getRateLimitBucket(pathname);
   if (bucket) {
@@ -103,13 +84,12 @@ export async function middleware(request: NextRequest) {
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
       "unknown";
-    const rateLimitIdentifier = tenantHeader
-      ? `tenant:${tenantHeader}`
-      : ip;
+    const rateLimitIdentifier = tenantHeader ? `tenant:${tenantHeader}` : ip;
     const key = `${rateLimitIdentifier}:${pathname}`;
-    const allowed = checkRateLimit(key, bucket);
 
-    if (!allowed) {
+    const rl = await checkDistributedRateLimit(key, bucket.max, bucket.windowMs);
+
+    if (!rl.allowed) {
       const tooManyRes = new NextResponse(
         JSON.stringify({ error: "Too Many Requests", retryAfter: 60 }),
         {
@@ -117,11 +97,14 @@ export async function middleware(request: NextRequest) {
           headers: {
             "Content-Type": "application/json",
             "Retry-After": "60",
+            "X-RateLimit-Source": rl.source,
           },
         }
       );
       applySecurityHeaders(tooManyRes);
       tooManyRes.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+      tooManyRes.headers.set("traceparent", traceparentValue);
+      tooManyRes.headers.set("X-Request-Id", requestId);
       return tooManyRes;
     }
   }
@@ -260,6 +243,8 @@ export async function middleware(request: NextRequest) {
 
   applySecurityHeaders(supabaseResponse);
   supabaseResponse.headers.set("X-Response-Time", `${Date.now() - startTime}ms`);
+  supabaseResponse.headers.set("traceparent", traceparentValue);
+  supabaseResponse.headers.set("X-Request-Id", requestId);
   return supabaseResponse;
 }
 
