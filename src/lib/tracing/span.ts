@@ -10,14 +10,8 @@ const log = createLogger({ agentName: "tracing" });
 
 function randomHex(bytes: number): string {
   const arr = new Uint8Array(bytes);
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    crypto.getRandomValues(arr);
-  } else {
-    // Node.js fallback
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const nodeCrypto = require("crypto") as typeof import("crypto");
-    nodeCrypto.randomFillSync(arr);
-  }
+  // Node.js 18+ (required by Next.js 14) always exposes globalThis.crypto
+  crypto.getRandomValues(arr);
   return Array.from(arr)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
