@@ -1,7 +1,9 @@
 /**
  * Anomaly Scorer — detects unusual event patterns by frequency and payload size.
- * Cap: 500 anomalies (rolling).
+ * Cap: 500 anomalies (rolling). Persists to enterprise_memory when detected.
  */
+
+import { getAdminClient } from "@/lib/supabase/admin";
 
 export interface EventAnomaly {
   id: string;
@@ -62,6 +64,33 @@ export function scoreEventAnomaly(
   }
 
   ANOMALIES.push(anomaly);
+
+  // Persist high-score anomalies to enterprise_memory for durability
+  if (anomaly.anomalyScore >= 0.6) {
+    try {
+      getAdminClient()
+        .from("enterprise_memory")
+        .insert({
+          tenant_id: tenantId,
+          category: "event_anomaly",
+          entity_type: "event",
+          entity_id: anomaly.eventType,
+          summary: `Anomaly detected on ${anomaly.eventType}: ${anomaly.reason}`,
+          detail: {
+            anomalyId: anomaly.id,
+            eventType: anomaly.eventType,
+            anomalyScore: anomaly.anomalyScore,
+            reason: anomaly.reason,
+          },
+          tags: ["anomaly", anomaly.eventType],
+          importance: anomaly.anomalyScore >= 0.8 ? "high" : "normal",
+        })
+        .then(() => {});
+    } catch {
+      // non-fatal
+    }
+  }
+
   return anomaly;
 }
 

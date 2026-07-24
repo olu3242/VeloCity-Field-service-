@@ -1,6 +1,9 @@
 /**
  * Cross-tenant operational insights — anonymized, no raw tenant data exposed.
+ * Persists to enterprise_memory (category: "platform_insight") when an admin client is available.
  */
+
+import { getAdminClient } from "@/lib/supabase/admin";
 
 export interface CrossTenantInsight {
   id: string;
@@ -18,6 +21,7 @@ const INSIGHTS: CrossTenantInsight[] = [];
 
 export function recordInsight(
   insight: Omit<CrossTenantInsight, "id" | "generatedAt">,
+  persistTenantId?: string,
 ): CrossTenantInsight {
   const full: CrossTenantInsight = {
     ...insight,
@@ -26,6 +30,32 @@ export function recordInsight(
   };
   if (INSIGHTS.length >= MAX_INSIGHTS) INSIGHTS.shift();
   INSIGHTS.push(full);
+
+  if (persistTenantId) {
+    try {
+      getAdminClient()
+        .from("enterprise_memory")
+        .insert({
+          tenant_id: persistTenantId,
+          category: "platform_insight",
+          entity_type: "cross_tenant",
+          summary: `[${full.insightType}] ${full.title}: ${full.summary}`,
+          detail: {
+            insightId: full.id,
+            insightType: full.insightType,
+            affectedTenantCount: full.affectedTenantCount,
+            confidenceScore: full.confidenceScore,
+            tags: full.tags,
+          },
+          tags: ["platform_insight", full.insightType, ...full.tags],
+          importance: full.confidenceScore >= 0.8 ? "high" : "normal",
+        })
+        .then(() => {});
+    } catch {
+      // non-fatal — in-memory record always created
+    }
+  }
+
   return full;
 }
 
