@@ -40,13 +40,14 @@ function BookingForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const defaultCategory = searchParams.get("category") as ServiceCategory | null;
+  const defaultQuery = searchParams.get("q") ?? "";
 
   const [step, setStep] = useState<Step>("category");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [category, setCategory] = useState<ServiceCategory | null>(defaultCategory);
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(defaultQuery);
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState<UrgencyLevel>("scheduled");
   const [street, setStreet] = useState("");
