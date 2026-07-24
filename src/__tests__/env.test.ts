@@ -72,7 +72,7 @@ describe("isFeatureConfigured", () => {
   // isFeatureConfigured reads from the already-validated `env` singleton.
   // We import the module here; it will use the env vars set above.
   let isFeatureConfigured: (
-    feature: "twilio" | "sendgrid" | "google-maps" | "google-oauth"
+    feature: "twilio" | "sendgrid" | "google-maps" | "google-oauth" | "redis"
   ) => boolean;
 
   before(async () => {
@@ -102,6 +102,11 @@ describe("isFeatureConfigured", () => {
 
   test("returns false for 'google-oauth' when GOOGLE_OAUTH vars are absent", () => {
     const result = isFeatureConfigured("google-oauth");
+    assert.strictEqual(result, false);
+  });
+
+  test("returns false for 'redis' when UPSTASH_REDIS vars are absent", () => {
+    const result = isFeatureConfigured("redis");
     assert.strictEqual(result, false);
   });
 });

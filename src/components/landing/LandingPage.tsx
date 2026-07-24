@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import "./landing.css";
 
 export interface LandingStats {
@@ -58,6 +59,15 @@ function formatStatNumber(n: number): string {
 }
 
 export function LandingPage({ stats, testimonials }: { stats: LandingStats; testimonials: LandingTestimonial[] }) {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    router.push(q ? `/book?q=${encodeURIComponent(q)}` : "/book");
+  }
+
   useEffect(() => {
     const chips = Array.from(document.querySelectorAll<HTMLElement>(".cat-chip"));
     const onChipClick = (event: Event) => {
@@ -166,21 +176,30 @@ export function LandingPage({ stats, testimonials }: { stats: LandingStats; test
             <div className="search-panel">
               <p className="search-panel-title">BOOK A SERVICE</p>
 
-              <div className="search-input-wrap">
-                <span className="search-icon">📍</span>
-                <input type="text" className="search-input" placeholder="City, area, ZIP code, or service need" />
-              </div>
+              <form onSubmit={handleSearch}>
+                <div className="search-input-wrap">
+                  <span className="search-icon">📍</span>
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="City, area, ZIP code, or service need"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    aria-label="Search location or service"
+                  />
+                </div>
 
-              <div className="category-grid">
-                <div className="cat-chip active"><span className="cat-chip-icon">🔧</span> Plumbing</div>
-                <div className="cat-chip"><span className="cat-chip-icon">⚡</span> Electrical</div>
-                <div className="cat-chip"><span className="cat-chip-icon">❄️</span> HVAC / AC</div>
-                <div className="cat-chip"><span className="cat-chip-icon">🏠</span> Cleaning</div>
-                <div className="cat-chip"><span className="cat-chip-icon">🔨</span> Handyman</div>
-                <div className="cat-chip"><span className="cat-chip-icon">🌿</span> Lawn Care</div>
-              </div>
+                <div className="category-grid">
+                  <div className="cat-chip active"><span className="cat-chip-icon">🔧</span> Plumbing</div>
+                  <div className="cat-chip"><span className="cat-chip-icon">⚡</span> Electrical</div>
+                  <div className="cat-chip"><span className="cat-chip-icon">❄️</span> HVAC / AC</div>
+                  <div className="cat-chip"><span className="cat-chip-icon">🏠</span> Cleaning</div>
+                  <div className="cat-chip"><span className="cat-chip-icon">🔨</span> Handyman</div>
+                  <div className="cat-chip"><span className="cat-chip-icon">🌿</span> Lawn Care</div>
+                </div>
 
-              <a href="/book" className="btn-book">⚡ Find Providers Near Me</a>
+                <button type="submit" className="btn-book">⚡ Find Providers Near Me</button>
+              </form>
             </div>
 
             <div className="float-card float-card-1">
