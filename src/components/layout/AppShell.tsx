@@ -2,15 +2,6 @@ import { cn } from "@/lib/utils";
 
 type AppVariant = "customer" | "provider" | "admin" | "auth" | "dispatch" | "franchise";
 
-const variantClasses: Record<AppVariant, string> = {
-  customer: "bg-gray-50",
-  auth: "bg-gray-50",
-  provider: "bg-gray-950",
-  admin: "bg-gray-950",
-  dispatch: "bg-gray-950",
-  franchise: "bg-gray-950",
-};
-
 export function AppShell({
   children,
   variant = "customer",
@@ -18,8 +9,11 @@ export function AppShell({
   children: React.ReactNode;
   variant?: AppVariant;
 }) {
+  // All variants share the VeloCity dark background.
+  // The variant prop is kept for future per-section accent customization.
+  void variant;
   return (
-    <div className={cn("min-h-screen", variantClasses[variant])}>
+    <div className={cn("min-h-screen bg-background text-foreground")}>
       {children}
     </div>
   );

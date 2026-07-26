@@ -2,61 +2,125 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  VeloCity Design System
+  All CSS variables are set to the dark palette.
+  The ThemeProvider adds `.dark` to <html>; both `:root` and `.dark` carry
+  the same values so there is no flash of light content on initial render.
+*/
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 243 75% 59%;
-    --radius: 0.5rem;
+    /* VeloCity dark palette — mirrors landing.css tokens */
+    --background:    240 20% 5%;    /* #0a0a0f  vel-black  */
+    --foreground:    60  8% 95%;    /* #f4f4f0  vel-white  */
+
+    --card:          240 16% 12%;   /* #1a1a24  graphite   */
+    --card-foreground: 60 8% 95%;
+
+    --popover:       240 17% 8%;    /* #111118  carbon     */
+    --popover-foreground: 60 8% 95%;
+
+    --primary:       74 87% 58%;    /* #c8f135  volt       */
+    --primary-foreground: 240 20% 5%;
+
+    --secondary:     240 16% 17%;   /* #252533  slate      */
+    --secondary-foreground: 60 8% 95%;
+
+    --muted:         240 16% 12%;   /* #1a1a24  graphite   */
+    --muted-foreground: 240 11% 58%; /* #8888a0 */
+
+    --accent:        240 16% 17%;   /* #252533  slate      */
+    --accent-foreground: 74 87% 58%;/* volt                */
+
+    --destructive:   0 72% 51%;     /* red                 */
+    --destructive-foreground: 60 8% 95%;
+
+    --border:        240 15% 21%;   /* #2e2e3e             */
+    --input:         240 16% 17%;   /* #252533  slate      */
+    --ring:          74 87% 58%;    /* volt                */
+
+    --radius: 0.25rem;              /* 4px — sharp, industrial */
   }
 
+  /* .dark carries the same tokens — no shift when ThemeProvider toggles class */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 243 75% 59%;
+    --background:    240 20% 5%;
+    --foreground:    60  8% 95%;
+    --card:          240 16% 12%;
+    --card-foreground: 60 8% 95%;
+    --popover:       240 17% 8%;
+    --popover-foreground: 60 8% 95%;
+    --primary:       74 87% 58%;
+    --primary-foreground: 240 20% 5%;
+    --secondary:     240 16% 17%;
+    --secondary-foreground: 60 8% 95%;
+    --muted:         240 16% 12%;
+    --muted-foreground: 240 11% 58%;
+    --accent:        240 16% 17%;
+    --accent-foreground: 74 87% 58%;
+    --destructive:   0 72% 51%;
+    --destructive-foreground: 60 8% 95%;
+    --border:        240 15% 21%;
+    --input:         240 16% 17%;
+    --ring:          74 87% 58%;
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body, 'DM Sans', system-ui, sans-serif);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display, 'Bebas Neue', system-ui, sans-serif);
+    letter-spacing: 0.5px;
+  }
+
+  code, pre, kbd, .font-mono {
+    font-family: var(--font-mono, 'Space Mono', ui-monospace, monospace);
   }
 }
+
+/*
+  Remap legacy light-mode Tailwind utilities to the VeloCity dark palette.
+  These overrides apply site-wide so pages that still use bg-gray-50 / bg-white
+  automatically render in the correct dark theme without per-page edits.
+*/
+.bg-gray-50  { background-color: #111118 !important; }  /* carbon  */
+.bg-gray-100 { background-color: #1a1a24 !important; }  /* graphite */
+.bg-white    { background-color: #1a1a24 !important; }  /* graphite (card surface) */
+
+.text-gray-900 { color: #f4f4f0 !important; }
+.text-gray-800 { color: #f4f4f0 !important; }
+.text-gray-700 { color: #c8c8d8 !important; }
+.text-gray-600 { color: #a8a8be !important; }
+.text-gray-500 { color: #8888a0 !important; }
+.text-gray-400 { color: #8888a0 !important; }
+
+.border-gray-100 { border-color: #1a1a24 !important; }
+.border-gray-200 { border-color: #2e2e3e !important; }
+.border-gray-300 { border-color: #3a3a50 !important; }
+.border-gray-700 { border-color: #2e2e3e !important; }
+.border-gray-800 { border-color: #2e2e3e !important; }
+
+/* Auth form divider — bg-white used to mask the border-t */
+.bg-white.px-2 { background-color: #1a1a24 !important; }
+
+/* Error states — remap light red to dark red for dark backgrounds */
+.bg-red-50   { background-color: rgba(239, 68, 68, 0.08) !important; }
+.border-red-200 { border-color: rgba(239, 68, 68, 0.25) !important; }
+.text-red-700 { color: #f87171 !important; }
+
+/* Hover variants for the light gray remap */
+.hover\:bg-gray-50:hover  { background-color: #111118 !important; }
+.hover\:bg-gray-100:hover { background-color: #1a1a24 !important; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -66,4 +130,3 @@
     scroll-behavior: auto !important;
   }
 }
-

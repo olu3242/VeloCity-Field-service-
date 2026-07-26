@@ -55,19 +55,32 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold text-velocity-700">⚡ VeloCity</Link>
-          <h1 className="mt-4 text-2xl font-semibold text-gray-900">Create your account</h1>
-          <p className="text-gray-500 mt-1">Book your first service in minutes</p>
+          <Link href="/" className="inline-flex items-center gap-2 no-underline">
+            <div
+              className="w-9 h-9 flex items-center justify-center"
+              style={{
+                background: "#c8f135",
+                clipPath: "polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%)",
+              }}
+            >
+              <span className="font-display text-lg text-[#0a0a0f] leading-none">V</span>
+            </div>
+            <span className="font-display text-2xl tracking-widest text-foreground">
+              VELO<span className="text-[#c8f135]">CITY</span>
+            </span>
+          </Link>
+          <h1 className="mt-6 font-display text-3xl tracking-wide text-foreground">CREATE YOUR ACCOUNT</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Book your first service in minutes</p>
         </div>
 
-        <div className="bg-white rounded-xl border p-8 shadow-sm">
+        <div className="bg-card rounded border border-border p-8">
           <Button
             onClick={handleGoogleSignup}
             variant="outline"
-            className="w-full mb-6"
+            className="w-full mb-6 border-border text-foreground hover:border-[#c8f135] hover:text-[#c8f135]"
             type="button"
             disabled={loading}
           >
@@ -77,38 +90,45 @@ export default function SignupPage() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            Sign up with Google
+            Continue with Google
           </Button>
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t" />
+              <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500">or with email</span>
+              <span className="bg-card px-3 text-muted-foreground font-mono text-xs tracking-wider">
+                OR CONTINUE WITH EMAIL
+              </span>
             </div>
           </div>
 
           <form onSubmit={handleSignup} className="space-y-4">
             {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              <div className="rounded bg-red-950/20 border border-red-800/30 p-3 text-sm text-red-400">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Full name</Label>
+              <Label htmlFor="name" className="text-xs font-mono tracking-wider text-muted-foreground uppercase">
+                Full Name
+              </Label>
               <Input
                 id="name"
                 placeholder="Jane Smith"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
+                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground focus:border-[#c8f135] focus:ring-[#c8f135]/20"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-xs font-mono tracking-wider text-muted-foreground uppercase">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -116,11 +136,14 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground focus:border-[#c8f135] focus:ring-[#c8f135]/20"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-xs font-mono tracking-wider text-muted-foreground uppercase">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -129,23 +152,28 @@ export default function SignupPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground focus:border-[#c8f135] focus:ring-[#c8f135]/20"
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Create account"}
+            <Button
+              type="submit"
+              className="w-full bg-[#c8f135] text-[#0a0a0f] font-bold hover:bg-[#d4ff3d] border-0"
+              disabled={loading}
+            >
+              {loading ? "Creating account…" : "⚡ Create Account"}
             </Button>
           </form>
 
-          <p className="text-xs text-center text-gray-400 mt-4">
+          <p className="text-xs text-center text-muted-foreground mt-4">
             By signing up, you agree to our{" "}
-            <Link href="/terms" className="underline">Terms</Link> and{" "}
-            <Link href="/privacy" className="underline">Privacy Policy</Link>.
+            <Link href="/terms" className="text-[#c8f135] hover:underline">Terms</Link> and{" "}
+            <Link href="/privacy" className="text-[#c8f135] hover:underline">Privacy Policy</Link>.
           </p>
 
-          <p className="text-center text-sm text-gray-500 mt-4">
+          <p className="text-center text-sm text-muted-foreground mt-4">
             Already have an account?{" "}
-            <Link href="/auth/login" className="text-velocity-600 hover:underline font-medium">
+            <Link href="/auth/login" className="text-[#c8f135] hover:underline font-medium">
               Sign in
             </Link>
           </p>
