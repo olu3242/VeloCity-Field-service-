@@ -52,7 +52,8 @@ function defaultChecks(domain: CertificationDomain): CertificationCheck[] {
     compliance:             [{ name: "audit_recorded", passed: true, score: 100 }, { name: "data_retention_ok", passed: true, score: 100 }],
     ai_governance:          [{ name: "agent_decision_logged", passed: true, score: 100 }, { name: "confidence_above_threshold", passed: true, score: 85 }],
     operational_efficiency: [{ name: "duration_within_sla", passed: true, score: 90 }, { name: "retries_minimal", passed: true, score: 100 }],
-    ecosystem_health:       [{ name: "knowledge_updated", passed: true, score: 100 }, { name: "twin_synced", passed: false, score: 0 }],
+    ecosystem_health:         [{ name: "knowledge_updated", passed: true, score: 100 }, { name: "twin_synced", passed: false, score: 0 }],
+    relationship_intelligence:[{ name: "review_captured", passed: false, score: 0 }, { name: "reward_settled", passed: false, score: 0 }, { name: "relationship_score_updated", passed: false, score: 0 }],
   };
   return base[domain] ?? [];
 }

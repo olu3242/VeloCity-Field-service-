@@ -37,11 +37,31 @@ export const WORKSTREAM_DOMAINS = [
 
 export type WorkstreamDomain = typeof WORKSTREAM_DOMAINS[number];
 
+// Relationship lifecycle events — emitted by RIEF workstreams.
+// All 17 events must be present for relationship workstream certification.
+export const RELATIONSHIP_EVENTS = [
+  "ReviewCaptured", "RecognitionSubmitted", "RewardCalculated",
+  "RewardAuthorized", "RewardSettled", "WalletUpdated",
+  "RelationshipScoreUpdated", "ReferralTracked", "MembershipEvaluated",
+  "RecognitionGranted", "EnterpriseMemoryUpdated", "KnowledgeGraphUpdated",
+  "DigitalTwinUpdated", "CustomerSuccessUpdated", "ProviderIntelligenceUpdated",
+  "CommercialIntelligenceUpdated", "RelationshipCertified",
+] as const;
+
+export type RelationshipEvent = typeof RELATIONSHIP_EVENTS[number];
+
+export const REQUIRED_RELATIONSHIP_EVENTS: RelationshipEvent[] = [
+  "ReviewCaptured", "RewardCalculated", "RewardAuthorized", "RewardSettled",
+  "WalletUpdated", "RelationshipScoreUpdated", "EnterpriseMemoryUpdated",
+  "KnowledgeGraphUpdated", "DigitalTwinUpdated", "CustomerSuccessUpdated",
+  "ProviderIntelligenceUpdated", "RelationshipCertified",
+];
+
 export const CERTIFICATION_DOMAINS = [
   "runtime_reliability", "customer_success", "provider_excellence",
   "financial_integrity", "commercial_performance", "franchise_operations",
   "security", "compliance", "ai_governance", "operational_efficiency",
-  "ecosystem_health",
+  "ecosystem_health", "relationship_intelligence",
 ] as const;
 
 export type CertificationDomain = typeof CERTIFICATION_DOMAINS[number];
