@@ -98,7 +98,12 @@ export function bootstrapMetadata(): void {
     fields: [
       { name: "id", kind: "text", group: "General", order: 0, readOnly: true, validation: { format: "uuid" } },
       { name: "customer_id", kind: "lookup", label: "Customer", targetEntity: "customer", group: "Parties", order: 1, searchable: true, related: true, aiSuggestions: true, validation: { required: true } },
-      { name: "provider_id", kind: "lookup", label: "Provider", targetEntity: "provider", group: "Parties", order: 2, searchable: true, related: true, aiSuggestions: true, validation: { activeOnly: true, businessRules: ["provider_active"] } },
+      // activeOnly is enforced by cross-record validation against the referenced
+      // provider. The 'provider_active' business rule is NOT declared here: rules
+      // evaluate the local record, and a job's own `status` field means the job's
+      // lifecycle, not the provider's — wiring it here would reject every job
+      // whose own status was not "active".
+      { name: "provider_id", kind: "lookup", label: "Provider", targetEntity: "provider", group: "Parties", order: 2, searchable: true, related: true, aiSuggestions: true, validation: { activeOnly: true } },
       { name: "title", kind: "text", group: "General", order: 3, searchable: true, validation: { required: true, minLength: 3, maxLength: 200 } },
       { name: "description", kind: "text", group: "General", order: 4, searchable: true, validation: { maxLength: 4000 } },
       { name: "category", kind: "text", group: "General", order: 5, validation: { required: true } },
