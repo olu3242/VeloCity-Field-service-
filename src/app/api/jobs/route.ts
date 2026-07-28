@@ -5,6 +5,7 @@ import { bookingSchema, validationError } from "@/lib/validation";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
 import { validateServiceArea } from "@/lib/geo/validateServiceArea";
+import { observe } from "@/lib/idxf-integration/shadow-validator";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -97,31 +98,46 @@ export async function POST(request: NextRequest) {
     { userId: user.id, tenantId }
   );
 
+  const jobInsert = {
+    customer_id: user.id,
+    tenant_id: tenantId,
+    category: body.category,
+    title: body.title,
+    description: body.description,
+    urgency: body.urgency,
+    status: "submitted",
+    street: body.street,
+    unit: body.unit ?? null,
+    city: body.city,
+    state: body.state,
+    zip: body.zip,
+    preferred_date: body.preferred_date ?? null,
+    preferred_time_start: body.preferred_time_start ?? null,
+    preferred_time_end: body.preferred_time_end ?? null,
+    photo_urls: body.photo_urls,
+    document_urls: [],
+    ai_classification: classification ?? {},
+    ai_match_scores: {},
+    service_type_id: body.service_type_id ?? null,
+    service_package_id: body.service_package_id ?? null,
+  };
+
+  // IDXF shadow validation — observation only. Reaching this line means the
+  // route's own schema and serviceability checks already passed, so
+  // legacyAccepted is true. This never blocks and never alters the response;
+  // it records where IDXF and the existing checks disagree so enforcement can
+  // later be enabled with a known blast radius.
+  observe("job", jobInsert, {
+    tenantId,
+    legacyAccepted: true,
+    source: "api.jobs.create",
+  });
+
+  // Inserts the same object the shadow validator observed, so the two cannot
+  // drift apart as fields are added.
   const { data: job, error } = await supabase
     .from("jobs")
-    .insert({
-      customer_id: user.id,
-      tenant_id: tenantId,
-      category: body.category,
-      title: body.title,
-      description: body.description,
-      urgency: body.urgency,
-      status: "submitted",
-      street: body.street,
-      unit: body.unit ?? null,
-      city: body.city,
-      state: body.state,
-      zip: body.zip,
-      preferred_date: body.preferred_date ?? null,
-      preferred_time_start: body.preferred_time_start ?? null,
-      preferred_time_end: body.preferred_time_end ?? null,
-      photo_urls: body.photo_urls,
-      document_urls: [],
-      ai_classification: classification ?? {},
-      ai_match_scores: {},
-      service_type_id: body.service_type_id ?? null,
-      service_package_id: body.service_package_id ?? null,
-    })
+    .insert(jobInsert)
     .select()
     .single();
 

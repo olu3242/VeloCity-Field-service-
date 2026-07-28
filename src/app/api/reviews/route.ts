@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { rex } from "@/lib/agents/rex";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
+import { observe } from "@/lib/idxf-integration/shadow-validator";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -34,6 +35,20 @@ export async function POST(request: NextRequest) {
     comment ?? "",
     `${job.category} job in ${job.city}`,
     { jobId: job_id, tenantId }
+  );
+
+  // IDXF shadow validation — observation only, never blocking. Reaching here
+  // means the route's own ownership and job-status checks passed.
+  observe(
+    "review",
+    {
+      job_id,
+      customer_id: user.id,
+      provider_id: job.provider_id,
+      rating,
+      comment: comment ?? null,
+    },
+    { tenantId, legacyAccepted: true, source: "api.reviews.create" }
   );
 
   const { data: review, error } = await supabase
