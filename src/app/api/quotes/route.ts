@@ -4,6 +4,7 @@ import { quinn } from "@/lib/agents/quinn";
 import { createQuoteSchema, validationError } from "@/lib/validation";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
+import { observe } from "@/lib/idxf-integration/shadow-validator";
 import { calculatePrice, validateQuote } from "@/lib/pricing";
 import type { QuoteLineItem, ServiceCategory, UrgencyLevel } from "@/types";
 
@@ -84,22 +85,34 @@ export async function POST(request: NextRequest) {
     { jobId: body.job_id, tenantId }
   );
 
+  const quoteInsert = {
+    job_id: body.job_id,
+    tenant_id: tenantId,
+    provider_id: provider.id,
+    is_change_order: body.is_change_order ?? false,
+    parent_quote_id: body.parent_quote_id ?? null,
+    line_items: lineItems,
+    subtotal_cents: subtotal,
+    tax_cents: tax,
+    total_cents: total,
+    deposit_required_cents: deposit,
+    notes: body.notes ?? null,
+    valid_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+  };
+
+  // IDXF shadow validation — observation only, never blocking. Especially
+  // useful here: this route computes total_cents itself while the quote entity
+  // derives it as subtotal + tax, so a disagreement between the two surfaces as
+  // a divergence rather than shipping an inconsistent total.
+  observe("quote", quoteInsert, {
+    tenantId,
+    legacyAccepted: true,
+    source: "api.quotes.create",
+  });
+
   const { data: quote, error } = await supabase
     .from("quotes")
-    .insert({
-      job_id: body.job_id,
-      tenant_id: tenantId,
-      provider_id: provider.id,
-      is_change_order: body.is_change_order ?? false,
-      parent_quote_id: body.parent_quote_id ?? null,
-      line_items: lineItems,
-      subtotal_cents: subtotal,
-      tax_cents: tax,
-      total_cents: total,
-      deposit_required_cents: deposit,
-      notes: body.notes ?? null,
-      valid_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-    })
+    .insert(quoteInsert)
     .select()
     .single();
 

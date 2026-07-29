@@ -222,6 +222,66 @@ registerBusinessRule({
   },
 });
 
+registerBusinessRule({
+  id: "quote_not_expired",
+  label: "Quote still valid",
+  description: "A quote should not be acted on after its validity date.",
+  reads: ["valid_until", "approved_at"],
+  severity: "warning",
+  evaluate: (record) => {
+    const validUntil = asDate(record.valid_until);
+    if (!validUntil) return pass("warning", "No validity date set.");
+    // An already-approved quote is historical; expiry no longer matters.
+    if (record.approved_at) return pass("warning", "Quote already approved.");
+    if (validUntil.getTime() > Date.now()) return pass("warning", "Quote is still valid.");
+    return {
+      passed: false,
+      severity: "warning",
+      message: `Quote expired on ${validUntil.toISOString().slice(0, 10)}.`,
+    };
+  },
+});
+
+registerBusinessRule({
+  id: "offer_expiry_after_offered",
+  label: "Offer window is coherent",
+  description: "An offer must expire after it was made.",
+  reads: ["offered_at", "expires_at"],
+  severity: "error",
+  evaluate: (record) => {
+    const offered = asDate(record.offered_at);
+    const expires = asDate(record.expires_at);
+    if (!offered || !expires) return pass("error", "No offer window to compare.");
+    if (expires.getTime() > offered.getTime()) return pass("error", "Offer window is valid.");
+    return fail(
+      "error",
+      `Offer expires at ${expires.toISOString()}, which is not after it was offered (${offered.toISOString()}).`,
+      {
+        field: "expires_at",
+        value: new Date(offered.getTime() + 1_800_000).toISOString(),
+        description: "Set expiry to 30 minutes after the offer was made.",
+      }
+    );
+  },
+});
+
+registerBusinessRule({
+  id: "read_after_sent",
+  label: "Read timestamp is coherent",
+  description: "A notification cannot be read before it was sent.",
+  reads: ["sent_at", "read_at"],
+  severity: "error",
+  evaluate: (record) => {
+    const sent = asDate(record.sent_at);
+    const read = asDate(record.read_at);
+    // An unread notification is the normal case, not a failure.
+    if (!read) return pass("error", "Notification has not been read.");
+    if (!sent) return { passed: false, severity: "warning", message: "Notification is marked read but has no sent timestamp." };
+    if (read.getTime() >= sent.getTime()) return pass("error", "Read timestamp is coherent.");
+    return fail("error", `Read at ${read.toISOString()} is before it was sent at ${sent.toISOString()}.`);
+  },
+});
+
 /** Runs a named set of rules against a record. Unknown ids are reported. */
 export function evaluateRules(
   ruleIds: string[],

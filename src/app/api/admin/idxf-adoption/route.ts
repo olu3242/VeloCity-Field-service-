@@ -19,6 +19,20 @@ import {
   type ShadowVerdict,
 } from "@/lib/idxf-integration/shadow-validator";
 import { getAllEntities, getEntity } from "@/lib/metadata/entity-registry";
+import {
+  getEnforcementMode,
+  getAllEnforcementConfigs,
+  getEnforcementPosture,
+  setEnforcementMode,
+  resetEnforcement,
+  type EnforcementMode,
+} from "@/lib/idxf-integration/enforcement";
+import {
+  syncIndex,
+  getIndexCoverage,
+  columnsForEntity,
+  type RowLoader,
+} from "@/lib/idxf-integration/index-sync";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -38,7 +52,9 @@ const INSTRUMENTED_SOURCES = [
 async function requireAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Unauthorized", status: 401 as const, profile: null };
+  if (!user) {
+    return { error: "Unauthorized", status: 401 as const, profile: null, supabase: null, userId: null };
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -47,10 +63,10 @@ async function requireAdmin() {
     .maybeSingle();
 
   if (profile?.role !== "admin" && profile?.role !== "super_admin") {
-    return { error: "Forbidden", status: 403 as const, profile: null };
+    return { error: "Forbidden", status: 403 as const, profile: null, supabase: null, userId: null };
   }
 
-  return { error: null, status: 200 as const, profile };
+  return { error: null, status: 200 as const, profile, supabase, userId: user.id };
 }
 
 export async function GET(request: Request) {
@@ -88,22 +104,30 @@ export async function GET(request: Request) {
     uninstrumentedEntities: getAllEntities()
       .map((e) => e.key)
       .filter((key) => !INSTRUMENTED_SOURCES.some((s) => s.entity === key)),
+    enforcement: {
+      posture: getEnforcementPosture(),
+      configs: getAllEnforcementConfigs(),
+      defaultMode: "observe",
+    },
+    searchIndex: getIndexCoverage(tenantId),
     thresholds: ADOPTION_THRESHOLDS,
     scope: isSuperAdmin ? "platform" : "tenant",
     note:
-      "Shadow validation observes only — no request has ever been blocked by IDXF. Enforcement is a separate, per-entity decision informed by these figures.",
+      "Entities default to observe mode and block nothing. Enforcement is a separate, per-entity decision informed by these figures.",
     generatedAt: new Date().toISOString(),
   });
 }
 
 export async function POST(request: Request) {
   const auth = await requireAdmin();
-  if (auth.error || !auth.profile) {
+  if (auth.error || !auth.profile || !auth.supabase || !auth.userId) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
   const tenantId = getTenantId(auth.profile);
   const isSuperAdmin = auth.profile.role === "super_admin";
+  const supabase = auth.supabase;
+  const userId = auth.userId;
   let body: unknown;
   try {
     body = await request.json();
@@ -215,9 +239,152 @@ export async function POST(request: Request) {
     );
   }
 
+  // ── Enforcement ─────────────────────────────────────────────────────────
+
+  if (action === "set_enforcement") {
+    // Enforcement applies to every tenant, so only super_admin may change it.
+    if (!isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Forbidden — enforcement applies platform-wide and requires super_admin" },
+        { status: 403 }
+      );
+    }
+    const { entity, mode, reason, override } = raw;
+    if (typeof entity !== "string" || !getEntity(entity)) {
+      return NextResponse.json({ error: "entity required and must be registered" }, { status: 400 });
+    }
+    if (mode !== "observe" && mode !== "enforce") {
+      return NextResponse.json({ error: "mode must be 'observe' or 'enforce'" }, { status: 400 });
+    }
+    if (typeof reason !== "string" || reason.trim() === "") {
+      return NextResponse.json(
+        { error: "reason required — enforcement changes write behaviour and must be attributable" },
+        { status: 400 }
+      );
+    }
+
+    const result = setEnforcementMode(entity, mode as EnforcementMode, {
+      changedBy: userId,
+      reason,
+      override: override === true,
+    });
+
+    if (!result.ok) {
+      // Refused because the evidence does not support it — return the blockers
+      // so the caller knows what to resolve rather than just that it failed.
+      return NextResponse.json(
+        { action, error: result.error, blockers: result.blockers ?? [], success: false },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json({
+      action,
+      config: result.config,
+      posture: getEnforcementPosture(),
+      ...(result.config?.overrodeReadiness
+        ? { warning: "Enforcement was enabled despite the adoption report advising against it." }
+        : {}),
+      success: true,
+    });
+  }
+
+  if (action === "reset_enforcement") {
+    if (!isSuperAdmin) {
+      return NextResponse.json(
+        { error: "Forbidden — enforcement applies platform-wide and requires super_admin" },
+        { status: 403 }
+      );
+    }
+    const { entity } = raw;
+    if (typeof entity !== "string" || !getEntity(entity)) {
+      return NextResponse.json({ error: "entity required and must be registered" }, { status: 400 });
+    }
+    const reset = resetEnforcement(entity);
+    return NextResponse.json({
+      action,
+      entity,
+      reset,
+      mode: getEnforcementMode(entity),
+      success: true,
+    });
+  }
+
+  // ── Search index ────────────────────────────────────────────────────────
+
+  if (action === "sync_index") {
+    const { entities, limit } = raw;
+    if (entities !== undefined && !Array.isArray(entities)) {
+      return NextResponse.json({ error: "entities must be an array" }, { status: 400 });
+    }
+    const targets = Array.isArray(entities)
+      ? entities.filter((e): e is string => typeof e === "string")
+      : undefined;
+
+    if (targets) {
+      const unknown = targets.filter((e) => !getEntity(e));
+      if (unknown.length > 0) {
+        return NextResponse.json(
+          { error: `Unknown entities: ${unknown.join(", ")}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const capped = typeof limit === "number" ? Math.min(Math.max(1, limit), 2000) : 500;
+
+    // Rows are read through the caller's own RLS-scoped client, so the index is
+    // populated with exactly what this tenant is permitted to see.
+    const loader: RowLoader = async ({ entity, table, columns, limit: rowLimit }) => {
+      const { data, error } = await supabase
+        .from(table)
+        .select(columns.join(", "))
+        .limit(rowLimit);
+      if (error) {
+        // Returning null marks the entity as failed rather than clearing its
+        // index and reporting a successful sync of zero rows.
+        return null;
+      }
+      return (data ?? []) as unknown as Array<Record<string, unknown>>;
+    };
+
+    const result = await syncIndex(tenantId, loader, {
+      ...(targets ? { entities: targets } : {}),
+      limit: capped,
+    });
+
+    return NextResponse.json(
+      {
+        action,
+        result,
+        coverage: getIndexCoverage(tenantId),
+        ...(result.failedEntities.length > 0
+          ? {
+              warning: `These entities failed to load and kept their previous index: ${result.failedEntities.join(", ")}`,
+            }
+          : {}),
+        success: result.failedEntities.length === 0,
+      },
+      { status: result.failedEntities.length === 0 ? 200 : 207 }
+    );
+  }
+
+  if (action === "index_coverage") {
+    return NextResponse.json({
+      action,
+      coverage: getIndexCoverage(tenantId),
+      // Columns each entity needs, so a caller building its own sync knows what
+      // to select.
+      columnsByEntity: Object.fromEntries(
+        getAllEntities().map((e) => [e.key, columnsForEntity(e.key)])
+      ),
+      success: true,
+    });
+  }
+
   return NextResponse.json(
     {
-      error: `Unknown action: ${action}. Use 'entity_report', 'observations', 'clear_observations', or 'simulate'.`,
+      error: `Unknown action: ${action}. Use 'entity_report', 'observations', 'clear_observations', 'simulate', 'set_enforcement', 'reset_enforcement', 'sync_index', or 'index_coverage'.`,
     },
     { status: 400 }
   );

@@ -220,6 +220,123 @@ export function bootstrapMetadata(): void {
     ],
   });
 
+  // ── Quote ───────────────────────────────────────────────────────────────
+  registerEntity({
+    key: "quote",
+    label: "Quote",
+    domain: "finance",
+    table: "quotes",
+    displayField: "id",
+    extraWorkspaceTabs: ["Line Items"],
+    fields: [
+      { name: "id", kind: "text", group: "General", order: 0, readOnly: true, validation: { format: "uuid" } },
+      { name: "job_id", kind: "lookup", label: "Job", targetEntity: "job", group: "Links", order: 1, related: true, validation: { required: true } },
+      { name: "provider_id", kind: "lookup", label: "Provider", targetEntity: "provider", group: "Links", order: 2, related: true, validation: { activeOnly: true } },
+      { name: "is_change_order", kind: "boolean", label: "Change Order", group: "General", order: 3, validation: {} },
+      { name: "parent_quote_id", kind: "parent", label: "Parent Quote", targetEntity: "quote", group: "Links", order: 4, validation: {} },
+      { name: "subtotal_cents", kind: "currency", label: "Subtotal", group: "Financial", order: 10, validation: { required: true, min: 0 } },
+      { name: "tax_cents", kind: "currency", label: "Tax", group: "Financial", order: 11, validation: { min: 0 } },
+      { name: "deposit_required_cents", kind: "currency", label: "Deposit Required", group: "Financial", order: 12, validation: { min: 0 } },
+      // total is derived, so a quote whose stored total disagrees with its parts
+      // shows up immediately as a shadow divergence.
+      { name: "total_cents", kind: "formula", label: "Total", group: "Financial", order: 13, formula: "subtotal_cents + tax_cents", validation: { min: 0 } },
+      { name: "notes", kind: "text", group: "General", order: 20, searchable: true, validation: { maxLength: 4000 } },
+      { name: "valid_until", kind: "date", label: "Valid Until", group: "Scheduling", order: 21, validation: { businessRules: ["quote_not_expired"] } },
+      { name: "approved_at", kind: "date", label: "Approved", group: "System", order: 90, validation: {} },
+      { name: "created_at", kind: "date", label: "Created", group: "System", order: 91, readOnly: true, validation: {} },
+    ],
+  });
+
+  // ── Offer (provider_offers) ─────────────────────────────────────────────
+  registerEntity({
+    key: "offer",
+    label: "Offer",
+    domain: "operations",
+    table: "provider_offers",
+    displayField: "id",
+    fields: [
+      { name: "id", kind: "text", group: "General", order: 0, readOnly: true, validation: { format: "uuid" } },
+      { name: "job_id", kind: "lookup", label: "Job", targetEntity: "job", group: "Links", order: 1, related: true, validation: { required: true } },
+      { name: "provider_id", kind: "lookup", label: "Provider", targetEntity: "provider", group: "Links", order: 2, related: true, aiSuggestions: true, validation: { required: true, activeOnly: true } },
+      // Stored by the AI matching engine, not derived. Declaring it as a
+      // calculated `score` would need a formula, and any formula naming the
+      // field itself is a self-cycle the dependency graph rightly rejects.
+      { name: "match_score", kind: "number", label: "Match Score", group: "Insights", order: 3, validation: { min: 0, max: 100 } },
+      { name: "ai_reasoning", kind: "ai_summary", label: "AI Reasoning", group: "AI", order: 4, validation: {} },
+      { name: "offered_at", kind: "date", label: "Offered", group: "Scheduling", order: 10, validation: {} },
+      { name: "expires_at", kind: "date", label: "Expires", group: "Scheduling", order: 11, validation: { businessRules: ["offer_expiry_after_offered"] } },
+      { name: "rejection_reason", kind: "text", label: "Rejection Reason", group: "General", order: 20, validation: { maxLength: 1000 } },
+    ],
+  });
+
+  // ── Tip (provider_tips) ─────────────────────────────────────────────────
+  registerEntity({
+    key: "tip",
+    label: "Tip",
+    domain: "finance",
+    table: "provider_tips",
+    displayField: "id",
+    statusField: "payment_status",
+    activeStatuses: ["pending", "processing", "succeeded"],
+    fields: [
+      { name: "id", kind: "text", group: "General", order: 0, readOnly: true, validation: { format: "uuid" } },
+      { name: "job_id", kind: "lookup", label: "Job", targetEntity: "job", group: "Links", order: 1, related: true, validation: { required: true } },
+      { name: "customer_id", kind: "lookup", label: "Customer", targetEntity: "customer", group: "Links", order: 2, related: true, validation: { required: true } },
+      { name: "provider_id", kind: "lookup", label: "Provider", targetEntity: "provider", group: "Links", order: 3, related: true, validation: { required: true } },
+      { name: "amount_cents", kind: "currency", label: "Amount", group: "Financial", order: 4, validation: { required: true, min: 1 } },
+      { name: "currency", kind: "text", group: "Financial", order: 5, validation: { maxLength: 3 } },
+      { name: "payment_status", kind: "text", label: "Payment Status", group: "General", order: 6, validation: { required: true } },
+      { name: "note", kind: "text", group: "General", order: 7, searchable: true, validation: { maxLength: 500 } },
+      { name: "stripe_payment_intent_id", kind: "text", label: "Stripe Intent", group: "Billing", order: 10, sensitive: true, validation: {} },
+      { name: "idempotency_key", kind: "text", label: "Idempotency Key", group: "System", order: 90, sensitive: true, validation: {} },
+    ],
+  });
+
+  // ── Notification ────────────────────────────────────────────────────────
+  registerEntity({
+    key: "notification",
+    label: "Notification",
+    domain: "platform",
+    table: "notifications",
+    displayField: "title",
+    fields: [
+      { name: "id", kind: "text", group: "General", order: 0, readOnly: true, validation: { format: "uuid" } },
+      { name: "user_id", kind: "lookup", label: "Recipient", targetEntity: "customer", group: "Links", order: 1, related: true, validation: { required: true } },
+      { name: "channel", kind: "text", group: "Delivery", order: 2, validation: { required: true } },
+      { name: "title", kind: "text", group: "Content", order: 3, searchable: true, validation: { required: true, maxLength: 200 } },
+      { name: "body", kind: "text", group: "Content", order: 4, searchable: true, validation: { maxLength: 2000 } },
+      { name: "is_read", kind: "boolean", label: "Read", group: "Delivery", order: 5, validation: {} },
+      { name: "sent_at", kind: "date", label: "Sent", group: "System", order: 90, validation: {} },
+      { name: "read_at", kind: "date", label: "Read At", group: "System", order: 91, validation: { businessRules: ["read_after_sent"] } },
+    ],
+  });
+
+  // ── Payout (payout_queue) ───────────────────────────────────────────────
+  registerEntity({
+    key: "payout",
+    label: "Payout",
+    domain: "finance",
+    table: "payout_queue",
+    displayField: "id",
+    statusField: "status",
+    activeStatuses: ["queued", "pending", "processing"],
+    fields: [
+      { name: "id", kind: "text", group: "General", order: 0, readOnly: true, validation: { format: "uuid" } },
+      { name: "job_id", kind: "lookup", label: "Job", targetEntity: "job", group: "Links", order: 1, related: true, validation: { required: true } },
+      { name: "provider_id", kind: "lookup", label: "Provider", targetEntity: "provider", group: "Links", order: 2, related: true, validation: { required: true } },
+      { name: "amount_cents", kind: "currency", label: "Gross Amount", group: "Financial", order: 3, validation: { required: true, min: 0 } },
+      { name: "platform_fee_cents", kind: "currency", label: "Platform Fee", group: "Financial", order: 4, validation: { min: 0 } },
+      // Derived, so a stored net that disagrees with gross minus fee surfaces
+      // as a divergence rather than silently paying out the wrong figure.
+      { name: "net_payout_cents", kind: "formula", label: "Net Payout", group: "Financial", order: 5, formula: "amount_cents - platform_fee_cents", validation: { min: 0 } },
+      { name: "status", kind: "text", group: "General", order: 6, validation: { required: true } },
+      { name: "hold_reason", kind: "text", label: "Hold Reason", group: "General", order: 7, validation: { maxLength: 500 } },
+      { name: "release_after", kind: "date", label: "Release After", group: "Scheduling", order: 8, validation: {} },
+      { name: "attempts", kind: "number", group: "System", order: 90, validation: { min: 0 } },
+      { name: "error_message", kind: "text", label: "Error", group: "System", order: 91, validation: { maxLength: 2000 } },
+    ],
+  });
+
   // ── Relationships ───────────────────────────────────────────────────────
   registerRelationships([
     { name: "jobs", from: "customer", to: "job", cardinality: "one_to_many", foreignKey: "customer_id", inverseName: "customer", weight: 0.95, label: "Jobs" },
@@ -246,10 +363,39 @@ export function bootstrapMetadata(): void {
     { name: "customer", from: "review", to: "customer", cardinality: "many_to_one", foreignKey: "id", inverseName: "reviews", weight: 0.6, label: "Customer" },
     { name: "provider", from: "review", to: "provider", cardinality: "many_to_one", foreignKey: "id", inverseName: "reviews", weight: 0.75, label: "Provider" },
     { name: "job", from: "dispute", to: "job", cardinality: "many_to_one", foreignKey: "id", inverseName: "disputes", weight: 0.85, label: "Job" },
+
+    // Quotes, offers, tips and payouts all hang off a job.
+    { name: "quotes", from: "job", to: "quote", cardinality: "one_to_many", foreignKey: "job_id", inverseName: "job", weight: 0.85, label: "Quotes" },
+    { name: "offers", from: "job", to: "offer", cardinality: "one_to_many", foreignKey: "job_id", inverseName: "job", weight: 0.8, label: "Offers" },
+    { name: "tips", from: "job", to: "tip", cardinality: "one_to_many", foreignKey: "job_id", inverseName: "job", weight: 0.6, label: "Tips" },
+    { name: "payouts", from: "job", to: "payout", cardinality: "one_to_many", foreignKey: "job_id", inverseName: "job", weight: 0.85, label: "Payouts" },
+
+    { name: "job", from: "quote", to: "job", cardinality: "many_to_one", foreignKey: "id", inverseName: "quotes", weight: 0.85, label: "Job" },
+    { name: "provider", from: "quote", to: "provider", cardinality: "many_to_one", foreignKey: "id", inverseName: "quotes", weight: 0.7, label: "Provider" },
+    { name: "job", from: "offer", to: "job", cardinality: "many_to_one", foreignKey: "id", inverseName: "offers", weight: 0.8, label: "Job" },
+    { name: "provider", from: "offer", to: "provider", cardinality: "many_to_one", foreignKey: "id", inverseName: "offers", weight: 0.8, label: "Provider" },
+    { name: "job", from: "tip", to: "job", cardinality: "many_to_one", foreignKey: "id", inverseName: "tips", weight: 0.6, label: "Job" },
+    { name: "provider", from: "tip", to: "provider", cardinality: "many_to_one", foreignKey: "id", inverseName: "tips", weight: 0.7, label: "Provider" },
+    { name: "job", from: "payout", to: "job", cardinality: "many_to_one", foreignKey: "id", inverseName: "payouts", weight: 0.85, label: "Job" },
+    { name: "provider", from: "payout", to: "provider", cardinality: "many_to_one", foreignKey: "id", inverseName: "payouts", weight: 0.9, label: "Provider" },
+
+    // Provider-side inverses so a provider workspace surfaces its own pipeline.
+    { name: "quotes", from: "provider", to: "quote", cardinality: "one_to_many", foreignKey: "provider_id", inverseName: "provider", weight: 0.7, label: "Quotes" },
+    { name: "offers", from: "provider", to: "offer", cardinality: "one_to_many", foreignKey: "provider_id", inverseName: "provider", weight: 0.8, label: "Offers" },
+    { name: "tips", from: "provider", to: "tip", cardinality: "one_to_many", foreignKey: "provider_id", inverseName: "provider", weight: 0.7, label: "Tips" },
+    { name: "payouts", from: "provider", to: "payout", cardinality: "one_to_many", foreignKey: "provider_id", inverseName: "provider", weight: 0.9, label: "Payouts" },
+
+    { name: "notifications", from: "customer", to: "notification", cardinality: "one_to_many", foreignKey: "user_id", inverseName: "user", weight: 0.4, label: "Notifications" },
+    { name: "user", from: "notification", to: "customer", cardinality: "many_to_one", foreignKey: "id", inverseName: "notifications", weight: 0.4, label: "Recipient" },
+    { name: "tips", from: "customer", to: "tip", cardinality: "one_to_many", foreignKey: "customer_id", inverseName: "customer", weight: 0.5, label: "Tips" },
+    { name: "customer", from: "tip", to: "customer", cardinality: "many_to_one", foreignKey: "id", inverseName: "tips", weight: 0.5, label: "Customer" },
   ]);
 
   // Version every entity so drift against the live registry is detectable.
-  for (const entity of ["customer", "provider", "job", "payment", "membership", "review", "dispute", "territory"]) {
+  for (const entity of [
+    "customer", "provider", "job", "payment", "membership", "review", "dispute", "territory",
+    "quote", "offer", "tip", "notification", "payout",
+  ]) {
     captureSchema(entity, "IDXF bootstrap");
   }
 }
