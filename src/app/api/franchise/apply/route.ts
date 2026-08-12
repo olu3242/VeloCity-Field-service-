@@ -77,8 +77,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // Write audit log
+  // Write audit log.
+  // audit_logs is tenant-scoped with a database default, so omitting tenant_id
+  // does not fail — it files the entry under the default tenant instead of the
+  // territory's, putting a governance record in the wrong tenant's trail. The
+  // operator row above is already created against territory.tenant_id; the
+  // audit entry must match it.
   await adminClient.from("audit_logs").insert({
+    tenant_id: territory.tenant_id,
     action: "franchise_operator_applied",
     actor_id: user.id,
     entity_type: "territory_operator",
