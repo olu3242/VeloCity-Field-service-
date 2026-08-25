@@ -8,6 +8,12 @@
  * for review — a heuristic must never silently reject a legitimate save.
  */
 
+// Bootstraps the entity, field and relationship registries. Importing the
+// sub-registries alone leaves them empty, so whichever module the bundler
+// happens to load first would read an unpopulated registry — crashing at
+// import time here, or silently returning empty results elsewhere.
+import "@/lib/metadata";
+
 import {
   getEntityFields,
   isNumericKind,

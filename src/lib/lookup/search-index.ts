@@ -9,6 +9,12 @@
  * one tenant's index can never be read through another's search.
  */
 
+// Bootstraps the entity, field and relationship registries. Importing the
+// sub-registries alone leaves them empty, so whichever module the bundler
+// happens to load first would read an unpopulated registry — crashing at
+// import time here, or silently returning empty results elsewhere.
+import "@/lib/metadata";
+
 import { getSearchableFields } from "@/lib/metadata/field-engine";
 import { getEntity } from "@/lib/metadata/entity-registry";
 

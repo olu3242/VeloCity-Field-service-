@@ -9,6 +9,12 @@
  * tenant's rows and carries no tenant dimension.
  */
 
+// Bootstraps the entity, field and relationship registries. Importing the
+// sub-registries alone leaves them empty, so whichever module the bundler
+// happens to load first would read an unpopulated registry — crashing at
+// import time here, or silently returning empty results elsewhere.
+import "@/lib/metadata";
+
 import { getAllEntities, type EntityDefinition } from "@/lib/metadata/entity-registry";
 import {
   getAllRelationships,

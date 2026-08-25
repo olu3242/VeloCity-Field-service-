@@ -8,6 +8,12 @@
  * caller keeps ownership of tenant-scoped reads.
  */
 
+// Bootstraps the entity, field and relationship registries. Importing the
+// sub-registries alone leaves them empty, so whichever module the bundler
+// happens to load first would read an unpopulated registry — crashing at
+// import time here, or silently returning empty results elsewhere.
+import "@/lib/metadata";
+
 import { getEntityFields, isCalculatedKind } from "@/lib/metadata/field-engine";
 import { getEntity } from "@/lib/metadata/entity-registry";
 import { validateRecord } from "@/lib/validation/validation-engine";

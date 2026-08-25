@@ -10,6 +10,12 @@
  * from 89, versions from the schema registry.
  */
 
+// Bootstraps the entity, field and relationship registries. Importing the
+// sub-registries alone leaves them empty, so whichever module the bundler
+// happens to load first would read an unpopulated registry — crashing at
+// import time here, or silently returning empty results elsewhere.
+import "@/lib/metadata";
+
 import { getEntity, type EntityDefinition } from "@/lib/metadata/entity-registry";
 import { getEntityFields, isCalculatedKind } from "@/lib/metadata/field-engine";
 import { getRelationshipsFrom } from "@/lib/metadata/relationship-registry";
