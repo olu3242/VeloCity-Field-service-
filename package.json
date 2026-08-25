@@ -8,8 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "audit:security": "node scripts/audit-security.mjs",
     "test": "npx tsx --test src/__tests__/*.test.ts",
-    "test:ci": "npx tsx --test src/__tests__/*.test.ts",
+    "test:ci": "npx tsx --test src/__tests__/*.test.ts && node scripts/audit-security.mjs",
     "db:seed": "npx tsx supabase/seed.ts",
     "db:reset": "npx supabase db reset && npm run db:seed",
     "agents:test": "npx tsx src/lib/agents/test-agents.ts"
