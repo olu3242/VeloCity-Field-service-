@@ -2,15 +2,15 @@
 // Protected by CRON_SECRET header
 
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeCron } from "@/lib/cron/auth";
 import { processAutomationQueue } from "@/lib/automation/worker";
 
 export async function POST(request: NextRequest) {
-  const secret = request.headers.get("x-cron-secret");
-  const expected = process.env.CRON_SECRET;
-
-  if (expected && secret !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Fails closed: an unset CRON_SECRET refuses the request rather than letting
+  // it through. This route drains the automation queue, so an unauthenticated
+  // caller could trigger real side effects.
+  const unauthorized = authorizeCron(request);
+  if (unauthorized) return unauthorized;
 
   try {
     const result = await processAutomationQueue();

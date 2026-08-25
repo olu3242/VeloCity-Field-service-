@@ -2,16 +2,17 @@
 // Runs once per day at 3 AM
 
 import { NextRequest, NextResponse } from "next/server";
+import { authorizeCron } from "@/lib/cron/auth";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { processAutomationQueue } from "@/lib/automation/worker";
 import { emitDueMembershipServices, emitExpiringMemberships } from "@/lib/membership/membershipLifecycle";
 
 export async function GET(request: NextRequest) {
-  const secret = request.headers.get("x-cron-secret") ?? request.nextUrl.searchParams.get("secret");
-  const expected = process.env.CRON_SECRET;
-  if (expected && secret !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // allowQueryParam preserves the ?secret= form this route's deployed cron
+  // schedule still uses. Header auth is preferred; drop the flag once the
+  // schedule sends x-cron-secret instead.
+  const unauthorized = authorizeCron(request, { allowQueryParam: true });
+  if (unauthorized) return unauthorized;
 
   const today = new Date().toISOString().split("T")[0];
 
