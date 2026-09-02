@@ -1,11 +1,29 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans, Space_Mono, Bebas_Neue } from "next/font/google";
 import "./globals.css";
 import "@/styles/velocity-theme.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { BrandProvider } from "@/components/providers/BrandProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+const spaceMono = Space_Mono({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
+const bebasNeue = Bebas_Neue({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "VeloCity Field Service",
@@ -20,7 +38,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${dmSans.variable} ${spaceMono.variable} ${bebasNeue.variable}`}>
         <ThemeProvider defaultTheme="dark">
           <BrandProvider>{children}</BrandProvider>
         </ThemeProvider>

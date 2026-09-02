@@ -1,25 +1,37 @@
+/*
+  VeloCity Brand Token Layer
+  These vars match landing.css exactly so every authenticated page
+  shares the same design language as the public landing page.
+*/
 :root {
-  /* Velocity Brand Colors */
-  --velocity-volt: #CCFF00;
-  --velocity-volt-dark: #AACC00;
-  --velocity-black: #0A0A0A;
-  --velocity-carbon: #111827;
-  --velocity-white: #F9FAFB;
-  --velocity-accent: #6070F2;
+  /* Core palette — identical to landing.css */
+  --velocity-black:    #0a0a0f;
+  --velocity-carbon:   #111118;
+  --velocity-graphite: #1a1a24;
+  --velocity-slate:    #252533;
+  --velocity-border:   #2e2e3e;
+  --velocity-volt:     #c8f135;   /* primary accent — exact landing page value */
+  --velocity-amber:    #f5a623;
+  --velocity-ice:      #a8d8f0;
+  --velocity-white:    #f4f4f0;
+  --velocity-muted:    #8888a0;
 
-  /* Semantic tokens */
-  --velocity-bg-primary: var(--velocity-black);
-  --velocity-bg-surface: var(--velocity-carbon);
+  /* Semantic aliases */
+  --velocity-bg-primary:   var(--velocity-black);
+  --velocity-bg-surface:   var(--velocity-carbon);
+  --velocity-bg-card:      var(--velocity-graphite);
   --velocity-text-primary: var(--velocity-white);
-  --velocity-text-accent: var(--velocity-volt);
-  --velocity-border: rgba(255,255,255,0.1);
+  --velocity-text-muted:   var(--velocity-muted);
+  --velocity-text-accent:  var(--velocity-volt);
+  --velocity-border-color: var(--velocity-border);
+
+  /* Typography — populated by next/font/google in layout.tsx */
+  --velocity-font-display: var(--font-display, 'Bebas Neue', sans-serif);
+  --velocity-font-body:    var(--font-body, 'DM Sans', system-ui, sans-serif);
+  --velocity-font-mono:    var(--font-mono, 'Space Mono', ui-monospace, monospace);
 
   /* Motion */
   --velocity-transition-fast: 150ms ease;
   --velocity-transition-base: 250ms ease;
   --velocity-transition-slow: 400ms ease;
-
-  /* Typography */
-  --velocity-font-display: system-ui, -apple-system, sans-serif;
-  --velocity-font-body: system-ui, -apple-system, sans-serif;
 }

@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/ui/stat-card";
 import { ProviderApprovalActions } from "@/components/admin/provider-actions";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import {
@@ -102,12 +103,14 @@ export default async function AdminDashboard() {
             { label: "Open Disputes", value: openDisputes?.toLocaleString() ?? "0", color: openDisputes ? "text-red-400" : "text-white" },
             { label: "Pending Providers", value: pendingProviders?.toLocaleString() ?? "0", color: pendingProviders ? "text-yellow-400" : "text-white" },
           ].map((kpi) => (
-            <Card key={kpi.label} className="bg-white/5 border-white/10">
-              <CardContent className="pt-6">
-                <div className={`text-4xl font-bold ${kpi.color}`}>{kpi.value}</div>
-                <div className="text-sm text-white/50 mt-1">{kpi.label}</div>
-              </CardContent>
-            </Card>
+            <StatCard
+              key={kpi.label}
+              variant="dark"
+              className="bg-white/5"
+              label={kpi.label}
+              value={kpi.value}
+              valueClassName={kpi.color}
+            />
           ))}
         </div>
 
@@ -222,7 +225,7 @@ export default async function AdminDashboard() {
         {/* AI Agent Status — active state driven by live platform signals */}
         <div className="mt-8">
           <h2 className="text-lg font-semibold mb-4">AI Agent Status</h2>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {(
               [
                 { name: "ALICE",   domain: "Intake",      active: (totalJobs ?? 0) > 0 },

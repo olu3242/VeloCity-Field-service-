@@ -44,6 +44,11 @@ export const AUTOMATION_EVENT_TYPES = [
   "provider_late",
   "subscription_due",
   "warranty_callback_due",
+  "membership_created",
+  "membership_renewed",
+  "membership_expiring",
+  "membership_cancelled",
+  "renewal_failed",
   "daily_territory_analysis",
   "provider_scoring",
   "provider_scoring_due",
@@ -60,6 +65,11 @@ export const AUTOMATION_EVENT_TYPES = [
   "cancellation_fee_applied",
   "provider_penalty_applied",
   "tip_submitted",
+  "operator_approved",
+  "territory_activated",
+  "franchise_royalty_due",
+  "membership_renewal_due",
+  "provider_at_risk_detected",
 ] as const;
 
 export type AutomationEventType = (typeof AUTOMATION_EVENT_TYPES)[number];

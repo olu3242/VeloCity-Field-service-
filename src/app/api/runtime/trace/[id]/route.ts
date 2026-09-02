@@ -2,25 +2,33 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function assertAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-  const role = (profile as { role?: string } | null)?.role;
-  if (role !== "admin" && role !== "super_admin") return null;
-  return user;
+  const { data: profile } = await supabase.from("profiles").select("role, tenant_id").eq("id", user.id).maybeSingle();
+  const row = profile as { role?: string; tenant_id?: string } | null;
+  if (row?.role !== "admin" && row?.role !== "super_admin") return null;
+  if (!row.tenant_id) return null;
+  return { user, tenantId: row.tenant_id };
 }
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const user = await assertAdmin();
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const admin = await assertAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const traceId = params.id;
+  if (!UUID_RE.test(traceId)) {
+    return NextResponse.json({ error: "Invalid trace id" }, { status: 400 });
+  }
 
   const db = getAdminClient();
-  const traceId = params.id;
+  const tenantId = admin.tenantId;
 
   const [
     { data: events },
@@ -29,11 +37,11 @@ export async function GET(
     { data: agentLogs },
     { data: auditLogs },
   ] = await Promise.all([
-    db.from("automation_events").select("*").eq("id", traceId).limit(1),
-    db.from("automation_queue").select("*").or(`event_id.eq.${traceId},dedup_key.like.%${traceId}%`).order("created_at"),
-    db.from("automation_runs").select("*").or(`event_id.eq.${traceId}`).order("completed_at"),
-    db.from("agent_logs").select("*").or(`job_id.eq.${traceId}`).order("created_at").limit(20),
-    db.from("audit_logs").select("*").or(`entity_id.eq.${traceId}`).order("created_at").limit(20),
+    db.from("automation_events").select("*").eq("id", traceId).eq("tenant_id", tenantId).limit(1),
+    db.from("automation_queue").select("*").eq("tenant_id", tenantId).or(`event_id.eq.${traceId},dedup_key.like.%${traceId}%`).order("created_at"),
+    db.from("automation_runs").select("*").eq("tenant_id", tenantId).eq("event_id", traceId).order("completed_at"),
+    db.from("agent_logs").select("*").eq("tenant_id", tenantId).eq("job_id", traceId).order("created_at").limit(20),
+    db.from("audit_logs").select("*").eq("tenant_id", tenantId).eq("entity_id", traceId).order("created_at").limit(20),
   ]);
 
   const event = events?.[0];

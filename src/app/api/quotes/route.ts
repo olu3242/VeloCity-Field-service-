@@ -4,6 +4,7 @@ import { quinn } from "@/lib/agents/quinn";
 import { createQuoteSchema, validationError } from "@/lib/validation";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
+import { observe } from "@/lib/idxf-integration/shadow-validator";
 import { calculatePrice, validateQuote } from "@/lib/pricing";
 import type { QuoteLineItem, ServiceCategory, UrgencyLevel } from "@/types";
 
@@ -48,6 +49,19 @@ export async function POST(request: NextRequest) {
   const tax = Math.round(subtotal * 0.0825);
   const total = subtotal + tax;
   const deposit = Math.round(total * 0.3);
+
+  // Service Catalog: use a data-driven pricing profile when one exists for
+  // this category/tier, falling back to the hardcoded pricing rules otherwise.
+  const tier = job.urgency === "emergency" ? "emergency" : "standard";
+  const { data: pricingProfileRow } = await supabase
+    .from("service_pricing_profiles")
+    .select("base_price_cents, labor_rate_cents, travel_fee_cents, urgency_multiplier, commercial_multiplier")
+    .eq("tenant_id", tenantId)
+    .eq("category", job.category)
+    .eq("tier", tier)
+    .eq("is_active", true)
+    .maybeSingle();
+
   const pricingResult = calculatePrice({
     category: job.category as ServiceCategory,
     urgency: job.urgency as UrgencyLevel,
@@ -57,6 +71,7 @@ export async function POST(request: NextRequest) {
     complexity: "moderate",
     materialsEstimateCents: lineItems.filter((item) => item.type === "parts").reduce((sum, item) => sum + item.total_cents, 0),
     quotedAmountCents: total,
+    pricingProfile: pricingProfileRow ?? undefined,
   });
   const quoteValidation = validateQuote(total, pricingResult);
 
@@ -70,22 +85,34 @@ export async function POST(request: NextRequest) {
     { jobId: body.job_id, tenantId }
   );
 
+  const quoteInsert = {
+    job_id: body.job_id,
+    tenant_id: tenantId,
+    provider_id: provider.id,
+    is_change_order: body.is_change_order ?? false,
+    parent_quote_id: body.parent_quote_id ?? null,
+    line_items: lineItems,
+    subtotal_cents: subtotal,
+    tax_cents: tax,
+    total_cents: total,
+    deposit_required_cents: deposit,
+    notes: body.notes ?? null,
+    valid_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+  };
+
+  // IDXF shadow validation — observation only, never blocking. Especially
+  // useful here: this route computes total_cents itself while the quote entity
+  // derives it as subtotal + tax, so a disagreement between the two surfaces as
+  // a divergence rather than shipping an inconsistent total.
+  observe("quote", quoteInsert, {
+    tenantId,
+    legacyAccepted: true,
+    source: "api.quotes.create",
+  });
+
   const { data: quote, error } = await supabase
     .from("quotes")
-    .insert({
-      job_id: body.job_id,
-      tenant_id: tenantId,
-      provider_id: provider.id,
-      is_change_order: body.is_change_order ?? false,
-      parent_quote_id: body.parent_quote_id ?? null,
-      line_items: lineItems,
-      subtotal_cents: subtotal,
-      tax_cents: tax,
-      total_cents: total,
-      deposit_required_cents: deposit,
-      notes: body.notes ?? null,
-      valid_until: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-    })
+    .insert(quoteInsert)
     .select()
     .single();
 

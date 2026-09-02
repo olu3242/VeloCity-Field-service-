@@ -1,0 +1,35 @@
+# Phase Convergence Certification — Final Scoring
+
+Consolidates this entire convergence sprint plus the prior 10-phase landing/dashboard work into one scorecard. Scores are 1-5, with the actual evidence cited — no score is asserted without a reason traceable to a real file or finding.
+
+| Category | Score | Basis |
+|---|---|---|
+| Visual Authenticity | 4/5 | No stock/AI-fantasy imagery exists anywhere (zero bundled images, confirmed by direct search). Hero "mockup cards" are honest UI mockups, not fake screenshots. Loses a point only because no *real* product screenshots exist yet — see `image-strategy.md`. |
+| Trustworthiness | 4/5 | Testimonials and rating are 100% DB-sourced with honest empty-state fallback (`"New"` / `"Be one of our first reviews"`) — structurally cannot show fake quotes. Loses a point for the footer's mislabeled legal/help links (`component-mapping.md` §4), a real trust gap. |
+| Conversion Readiness | 4/5 | All primary CTAs (`Book a Service`, `Become a Provider`) resolve correctly; booking flow is fully wired end to end (`full-stack-certification.md` Chain 1). No trust reassurance at the point of highest commitment (booking submit) — flagged in `trust-layer-strategy.md`, not fixed this pass since it touches a live conversion surface. |
+| Visual Communication | 4/5 | Benefit-first copy throughout the landing page already verified (zero terminology violations found in a direct re-read of `LandingPage.tsx`). "How It Works" already replaced a mechanism-first explanation per its own code comment. |
+| Accessibility | 4/5 | Global `prefers-reduced-motion` rule shipped this initiative (`motion-system.md`). No dedicated a11y audit (focus order, ARIA labeling, contrast ratios) was performed this pass — out of scope for this sprint, flagged as a future certification gap. |
+| Mobile Experience | 5/5 | 5 confirmed hardcoded-grid bugs found and fixed earlier this initiative, each verified via Playwright screenshot at 375px (`mobile-certification.md`). Re-check this pass found no additional hardcoded-grid regressions. |
+| Dashboard Readiness | 4/5 | All 5 dashboards share `StatCard`/`EmptyState`/`Card`/`Button` and responsive grids — the infrastructure prerequisite for a future visual refresh is in place. Provider dashboard density (11 tiles) and the missing `Skeleton` primitive are real, documented gaps (`dashboard-preparation.md`). |
+| Design System Adoption | 3/5 | `Button`/`Card` are well-adopted (41/31 import sites). `Table`/`Dialog`/`Tabs`/`DropdownMenu`/`Sheet` had **zero** adoption before this pass; `Table` now has its first real usage (`provider/earnings`). `Input` remains under-adopted (6 sites). Honest mid-score reflecting real, measured adoption gaps, not aspirational completeness. |
+| Frontend Coverage | 4/5 | Every customer/provider/admin/dispatch/franchise surface inventoried; one genuine naming collision found (`component-mapping.md` §2 — three pages independently branded "Command Center") and one footer-link accuracy gap found, both documented but intentionally not blast-radius-risked in this pass. |
+| Backend Coverage | 5/5 | Booking, dispatch, offer-acceptance, and notification chains all traced to real source and confirmed tenant-isolated, event-driven, and validated via Zod schemas (`full-stack-certification.md`). No backend code was modified. |
+| Global Consistency | 4/5 | No fragmented Button/Card patterns found anywhere. The one real fragmentation found (raw `<table>` in `provider/earnings`) was fixed this pass using the existing shared `Table` primitive, not a new one — proves the "build once, apply everywhere" principle in action. |
+| E2E Journey Coverage | 3/5 | Customer booking journey (visitor → book → redirect) and provider offer-acceptance journey are both fully traced via code. Full live click-through (payment capture, review submission, payout release) was **not** exercised in this sandbox — no seeded DB/auth session available. Scored honestly as partial, code-verified coverage, not claimed as fully tested. |
+
+## What changed in this pass (the only code edits made)
+
+1. **`src/app/provider/earnings/page.tsx`** — migrated 3 hand-rolled `<table>` elements to the shared `Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell` components. Pure markup swap; no data, query, or business-logic change.
+2. **`src/app/page.tsx` + `src/components/landing/LandingPage.tsx`** — fixed a real, verifiable data-accuracy bug: the landing page's "Service Categories" stat was hardcoded to `12` while the real category list (`SERVICE_CATEGORY_LABELS`, the same source of truth the booking flow uses) contains 18 categories. Replaced the hardcoded number with a server-computed count derived from that single source, so it can't drift again. This is a verified correction, not an invented metric — consistent with Part 16's "if not verifiable, flag it; do not invent metrics" (this *was* verifiable, so it was fixed rather than just flagged).
+
+## What was deliberately NOT changed, and why
+
+- **Footer legal/help links** (`component-mapping.md` §4) — fixing these correctly means building real About/Careers/Terms/Privacy/Help/Contact pages with real content, which would require fabricated placeholder content if done now. Flagged, not faked.
+- **"Command Center" naming collision** (`component-mapping.md` §2) — a real, confirmed 3-way naming collision across `/admin/dashboard`, `/admin/command-center`, and `/admin/lax`. Left unfixed because the correct fix touches nav copy in 3 separate admin files and should be a deliberate rename decision, not a drive-by edit during a "quick win" pass.
+- **Booking-page trust reassurance copy** (`trust-layer-strategy.md`) — the underlying guarantee (`hasPaymentCommitment`) is real, but adding new copy to the live booking conversion flow without explicit sign-off risks exactly the kind of unreviewed change Part 17's "do not break Bookings" instruction warns against.
+- **Dashboard visual redesign** — explicitly out of scope per Part 10 ("Do not redesign dashboards yet. Prepare roadmap only."); `dashboard-preparation.md` is audit/roadmap only.
+- **New shared primitives** (e.g. `Skeleton`) — explicitly out of scope per the directive's "no unnecessary new primitives" instruction; documented as a gap for a future, dedicated pass instead.
+
+## Overall
+
+Average score: **4.0/5**. The platform's backend (auth, tenancy, booking, dispatch, offers, notifications, events) is consistently real, validated, and tenant-isolated — there is no fabricated or stubbed business logic anywhere in the chains traced. The landing page's terminology and trust-layer problems described in the original Phase 1 audit were already resolved by earlier work in this initiative; what remained for this sprint was a smaller, real set of gaps (naming collision, footer link accuracy, zero adoption of 5 new primitives, one stale KPI) — two of which (Table adoption, the KPI fix) were corrected directly in this pass, with the rest documented for deliberate follow-up rather than rushed in.

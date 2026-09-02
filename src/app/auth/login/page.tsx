@@ -29,7 +29,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Redirect based on role
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -56,19 +55,32 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="text-2xl font-bold text-velocity-700">⚡ VeloCity</Link>
-          <h1 className="mt-4 text-2xl font-semibold text-gray-900">Welcome back</h1>
-          <p className="text-gray-500 mt-1">Sign in to your account</p>
+          <Link href="/" className="inline-flex items-center gap-2 no-underline">
+            <div
+              className="w-9 h-9 flex items-center justify-center"
+              style={{
+                background: "#c8f135",
+                clipPath: "polygon(20% 0%, 80% 0%, 100% 50%, 80% 100%, 20% 100%, 0% 50%)",
+              }}
+            >
+              <span className="font-display text-lg text-[#0a0a0f] leading-none">V</span>
+            </div>
+            <span className="font-display text-2xl tracking-widest text-foreground">
+              VELO<span className="text-[#c8f135]">CITY</span>
+            </span>
+          </Link>
+          <h1 className="mt-6 font-display text-3xl tracking-wide text-foreground">WELCOME BACK</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Sign in to your account</p>
         </div>
 
-        <div className="bg-white rounded-xl border p-8 shadow-sm">
+        <div className="bg-card rounded border border-border p-8">
           <Button
             onClick={handleGoogleLogin}
             variant="outline"
-            className="w-full mb-6"
+            className="w-full mb-6 border-border text-foreground hover:border-[#c8f135] hover:text-[#c8f135]"
             type="button"
             disabled={loading}
           >
@@ -83,22 +95,26 @@ export default function LoginPage() {
 
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t" />
+              <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="bg-white px-2 text-gray-500">or continue with email</span>
+              <span className="bg-card px-3 text-muted-foreground font-mono text-xs tracking-wider">
+                OR CONTINUE WITH EMAIL
+              </span>
             </div>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              <div className="rounded bg-red-950/20 border border-red-800/30 p-3 text-sm text-red-400">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-xs font-mono tracking-wider text-muted-foreground uppercase">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -106,11 +122,14 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground focus:border-[#c8f135] focus:ring-[#c8f135]/20"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-xs font-mono tracking-wider text-muted-foreground uppercase">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -118,17 +137,22 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="bg-secondary border-border text-foreground placeholder:text-muted-foreground focus:border-[#c8f135] focus:ring-[#c8f135]/20"
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
+            <Button
+              type="submit"
+              className="w-full bg-[#c8f135] text-[#0a0a0f] font-bold hover:bg-[#d4ff3d] border-0"
+              disabled={loading}
+            >
+              {loading ? "Signing in…" : "⚡ Sign In"}
             </Button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
+          <p className="text-center text-sm text-muted-foreground mt-6">
             Don&apos;t have an account?{" "}
-            <Link href="/auth/signup" className="text-velocity-600 hover:underline font-medium">
+            <Link href="/auth/signup" className="text-[#c8f135] hover:underline font-medium">
               Sign up free
             </Link>
           </p>

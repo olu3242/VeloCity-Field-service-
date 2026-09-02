@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import {
   JOB_STATUS_LABELS,
   SERVICE_CATEGORY_ICONS,
@@ -136,41 +137,39 @@ export default async function ProviderEarningsPage() {
               {jobs.length === 0 ? (
                 <p className="text-sm text-gray-500">No completed jobs yet.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-gray-500">
-                        <th className="pb-2 font-medium">Job</th>
-                        <th className="pb-2 font-medium">Status</th>
-                        <th className="pb-2 font-medium text-right">Gross</th>
-                        <th className="pb-2 font-medium text-right">Your Payout (82%)</th>
-                        <th className="pb-2 font-medium text-right">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {jobs.map(job => (
-                        <tr key={job.id} className="py-2">
-                          <td className="py-2 pr-4">
-                            <div className="flex items-center gap-2">
-                              <span>{SERVICE_CATEGORY_ICONS[job.category as ServiceCategory] ?? "🛠️"}</span>
-                              <span className="font-medium text-gray-800">{job.title}</span>
-                            </div>
-                          </td>
-                          <td className="py-2 pr-4">
-                            <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700">
-                              {JOB_STATUS_LABELS[job.status as JobStatus] ?? job.status}
-                            </span>
-                          </td>
-                          <td className="py-2 pr-4 text-right text-gray-700">{formatCents(job.final_cost_cents ?? 0)}</td>
-                          <td className="py-2 pr-4 text-right text-green-600 font-medium">
-                            {formatCents(Math.round((job.final_cost_cents ?? 0) * 0.82))}
-                          </td>
-                          <td className="py-2 text-right text-gray-400">{formatDateTime(job.created_at)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Gross</TableHead>
+                      <TableHead className="text-right">Your Payout (82%)</TableHead>
+                      <TableHead className="text-right">Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobs.map(job => (
+                      <TableRow key={job.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span>{SERVICE_CATEGORY_ICONS[job.category as ServiceCategory] ?? "🛠️"}</span>
+                            <span className="font-medium text-gray-800">{job.title}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                            {JOB_STATUS_LABELS[job.status as JobStatus] ?? job.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-gray-700">{formatCents(job.final_cost_cents ?? 0)}</TableCell>
+                        <TableCell className="text-right text-green-600 font-medium">
+                          {formatCents(Math.round((job.final_cost_cents ?? 0) * 0.82))}
+                        </TableCell>
+                        <TableCell className="text-right text-gray-400">{formatDateTime(job.created_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -182,26 +181,24 @@ export default async function ProviderEarningsPage() {
               {tips.length === 0 ? (
                 <p className="text-sm text-gray-500">No tips received yet.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-gray-500">
-                        <th className="pb-2 font-medium">Job ID</th>
-                        <th className="pb-2 font-medium text-right">Amount</th>
-                        <th className="pb-2 font-medium text-right">Date</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {tips.map(tip => (
-                        <tr key={tip.id} className="py-2">
-                          <td className="py-2 pr-4 text-gray-500 font-mono text-xs">{tip.job_id?.slice(0, 12)}...</td>
-                          <td className="py-2 pr-4 text-right text-emerald-600 font-medium">{formatCents(tip.amount_cents)}</td>
-                          <td className="py-2 text-right text-gray-400">{formatDateTime(tip.created_at)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Job ID</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tips.map(tip => (
+                      <TableRow key={tip.id}>
+                        <TableCell className="text-gray-500 font-mono text-xs">{tip.job_id?.slice(0, 12)}...</TableCell>
+                        <TableCell className="text-right text-emerald-600 font-medium">{formatCents(tip.amount_cents)}</TableCell>
+                        <TableCell className="text-right text-gray-400">{formatDateTime(tip.created_at)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -213,34 +210,32 @@ export default async function ProviderEarningsPage() {
               {payouts.length === 0 ? (
                 <p className="text-sm text-gray-500">No payout history yet.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-gray-500">
-                        <th className="pb-2 font-medium">Amount</th>
-                        <th className="pb-2 font-medium">Status</th>
-                        <th className="pb-2 font-medium text-right">Created</th>
-                        <th className="pb-2 font-medium text-right">Released</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {payouts.map(payout => (
-                        <tr key={payout.id} className="py-2">
-                          <td className="py-2 pr-4 font-medium text-gray-800">{formatCents(payout.amount_cents ?? 0)}</td>
-                          <td className="py-2 pr-4">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${payoutStatusColor(payout.status)}`}>
-                              {payout.status}
-                            </span>
-                          </td>
-                          <td className="py-2 pr-4 text-right text-gray-400">{formatDateTime(payout.created_at)}</td>
-                          <td className="py-2 text-right text-gray-400">
-                            {payout.released_at ? formatDateTime(payout.released_at) : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Created</TableHead>
+                      <TableHead className="text-right">Released</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payouts.map(payout => (
+                      <TableRow key={payout.id}>
+                        <TableCell className="font-medium text-gray-800">{formatCents(payout.amount_cents ?? 0)}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${payoutStatusColor(payout.status)}`}>
+                            {payout.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-gray-400">{formatDateTime(payout.created_at)}</TableCell>
+                        <TableCell className="text-right text-gray-400">
+                          {payout.released_at ? formatDateTime(payout.released_at) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>

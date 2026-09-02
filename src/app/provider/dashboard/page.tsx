@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { OfferActions } from "@/components/jobs/offer-actions";
 import { OnlineToggle } from "@/components/provider/online-toggle";
 import {
@@ -21,6 +23,10 @@ import {
 } from "@/lib/scoring";
 import { recommendProviderPlan, forecastRevenue } from "@/lib/revenue";
 import { analyzeSupplyGap } from "@/lib/expansion";
+import { lena } from "@/lib/agents/lena";
+import { quinn } from "@/lib/agents/quinn";
+import { computeProviderGrowthIntelligence } from "@/lib/growth/providerGrowthIntelligence";
+import { computeProviderMembershipWork } from "@/lib/membership/providerMembershipWork";
 
 export default async function ProviderDashboard() {
   const supabase = await createClient();
@@ -124,6 +130,28 @@ export default async function ProviderDashboard() {
     activeProviders: Math.max(activePeerCount ?? 1, 1),
   });
 
+  // Provider Excellence (Batch X+1, Phase 10): skills/certifications read
+  // directly from the evidence tables computed by computeProviderSkill()/
+  // evaluateProviderCertification() on every job completion; learning,
+  // revenue, expansion, and quality recommendations are computed live by
+  // LENA/QUINN/the growth intelligence module — nothing here is hardcoded.
+  const [{ data: providerSkills }, { data: providerCertifications }, growthPath, qualityReport, growthIntelligence, membershipWork] =
+    await Promise.all([
+      supabase
+        .from("provider_skills")
+        .select("service_type_id, skill_tier, proficiency_score, completed_jobs_count, average_rating, service_types(name)")
+        .eq("provider_id", provider.id),
+      supabase
+        .from("provider_certifications")
+        .select("category, tier, is_active, awarded_at")
+        .eq("provider_id", provider.id)
+        .eq("is_active", true),
+      lena.recommendGrowthPath(provider.id),
+      quinn.assessQuality(provider.id),
+      computeProviderGrowthIntelligence(provider.id),
+      computeProviderMembershipWork(provider.id),
+    ]);
+
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <nav className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
@@ -144,6 +172,7 @@ export default async function ProviderDashboard() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Provider Dashboard</h1>
           <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm"><Link href="/provider/business">Business Profile</Link></Button>
             <Button asChild variant="outline" size="sm"><Link href="/provider/earnings">Earnings</Link></Button>
             {provider.status !== "approved" && (
               <Badge variant="warning">Status: {provider.status}</Badge>
@@ -152,31 +181,11 @@ export default async function ProviderDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-velocity-700">{offers?.length ?? 0}</div>
-              <div className="text-sm text-gray-500 mt-1">New Offers</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold">{activeJobs?.length ?? 0}</div>
-              <div className="text-sm text-gray-500 mt-1">Active Jobs</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-green-700">{formatCents(todayEarnings)}</div>
-              <div className="text-sm text-gray-500 mt-1">Today&apos;s Earnings</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold">{(provider.trust_score * 100).toFixed(0)}%</div>
-              <div className="text-sm text-gray-500 mt-1">Trust Score</div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <StatCard variant="dark" label="New Offers" value={offers?.length ?? 0} valueClassName="text-velocity-700" />
+          <StatCard variant="dark" label="Active Jobs" value={activeJobs?.length ?? 0} />
+          <StatCard variant="dark" label="Today's Earnings" value={formatCents(todayEarnings)} valueClassName="text-green-700" />
+          <StatCard variant="dark" label="Trust Score" value={`${(provider.trust_score * 100).toFixed(0)}%`} />
         </div>
 
         {/* Growth Intelligence */}
@@ -233,6 +242,133 @@ export default async function ProviderDashboard() {
               <CardContent>
                 <Badge>{planRecommendation.plan}</Badge>
                 <p className="mt-2 text-sm text-gray-500">{planRecommendation.reason}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Provider Excellence */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">Provider Excellence</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Skills</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!providerSkills?.length ? (
+                  <p className="text-sm text-gray-500">Complete jobs to build your skills graph.</p>
+                ) : (
+                  providerSkills.map((skill: any) => (
+                    <div key={skill.service_type_id} className="flex items-center justify-between text-sm">
+                      <span>{skill.service_types?.name ?? "Service"}</span>
+                      <Badge variant="secondary">{skill.skill_tier} · {skill.completed_jobs_count} jobs</Badge>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Certifications</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!providerCertifications?.length ? (
+                  <p className="text-sm text-gray-500">No active certifications yet — keep completing jobs to qualify.</p>
+                ) : (
+                  providerCertifications.map((cert: any) => (
+                    <div key={cert.category} className="flex items-center justify-between text-sm">
+                      <span>{SERVICE_CATEGORY_LABELS[cert.category as keyof typeof SERVICE_CATEGORY_LABELS] ?? cert.category}</span>
+                      <Badge>{cert.tier}</Badge>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Learning Recommendations</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!growthPath.learning_path.length ? (
+                  <p className="text-sm text-gray-500">No tier gaps detected.</p>
+                ) : (
+                  growthPath.learning_path.map((item) => (
+                    <p key={item.service_type_id} className="text-sm text-gray-500">
+                      <span className="font-medium text-gray-300">{item.service_type_name}:</span> {item.gap_summary}
+                    </p>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Quality Improvement</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!qualityReport.riskAlerts.length ? (
+                  <p className="text-sm text-gray-500">No quality risk alerts.</p>
+                ) : (
+                  qualityReport.riskAlerts.map((alert, idx) => (
+                    <p key={idx} className="text-sm text-gray-500">{alert.reason}</p>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Revenue Recommendations</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!growthIntelligence.pricingOpportunities.length ? (
+                  <p className="text-sm text-gray-500">No pricing variance detected against the platform average.</p>
+                ) : (
+                  growthIntelligence.pricingOpportunities.map((op) => (
+                    <p key={op.category} className="text-sm text-gray-500">{op.reason}</p>
+                  ))
+                )}
+                <p className="text-sm font-medium text-green-700">
+                  Expected revenue impact: {formatCents(growthIntelligence.expectedRevenueImpactCents)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Service Expansion Opportunities</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!growthIntelligence.serviceExpansionOpportunities.length ? (
+                  <p className="text-sm text-gray-500">No unserved demand detected in your area.</p>
+                ) : (
+                  growthIntelligence.serviceExpansionOpportunities.map((op) => (
+                    <p key={op.category} className="text-sm text-gray-500">{op.reason}</p>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Membership Work (Batch X+2, Phase 9) */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">Membership Work</h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Recurring Customers</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold">{membershipWork.recurringCustomerCount}</p>
+                <p className="text-sm text-gray-500">Active membership customers with upcoming work assigned to you</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Projected Membership Revenue</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-2xl font-semibold">{formatCents(membershipWork.projectedMembershipRevenueCents)}</p>
+                <p className="text-sm text-gray-500">Your payout share from completed membership-driven jobs</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Upcoming Membership Jobs</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {!membershipWork.upcomingMembershipJobs.length ? (
+                  <p className="text-sm text-gray-500">No upcoming membership-driven jobs.</p>
+                ) : (
+                  membershipWork.upcomingMembershipJobs.slice(0, 5).map((job) => (
+                    <p key={job.jobId} className="text-sm text-gray-500">
+                      <span className="font-medium text-gray-300">{job.planName}:</span>{" "}
+                      {SERVICE_CATEGORY_LABELS[job.category as keyof typeof SERVICE_CATEGORY_LABELS] ?? job.category}
+                      {job.scheduledStart ? ` — ${formatDateTime(job.scheduledStart)}` : ""}
+                    </p>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
@@ -304,11 +440,12 @@ export default async function ProviderDashboard() {
         <div>
           <h2 className="text-lg font-semibold mb-4">All Jobs</h2>
           {!jobs?.length ? (
-            <Card>
-              <CardContent className="py-12 text-center text-gray-500">
-                No jobs yet. Make sure you&apos;re online to receive offers!
-              </CardContent>
-            </Card>
+            <EmptyState
+              variant="dark"
+              icon="📋"
+              title="No jobs yet"
+              description="Make sure you're online to start receiving job offers in your area."
+            />
           ) : (
             <div className="space-y-2">
               {jobs.map((job: Job) => (

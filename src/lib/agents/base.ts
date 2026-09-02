@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { AgentName, AgentResponse } from "@/types";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getEnv } from "@/lib/env";
-import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { getTenantIdOrDefault } from "@/lib/tenancy";
 
 export interface AgentContext {
   jobId?: string;
@@ -85,7 +85,7 @@ export abstract class BaseAgent {
       const supabase = await createAdminClient();
       await supabase.from("agent_logs").insert({
         agent_name: this.name,
-        tenant_id: context.tenantId ?? DEFAULT_TENANT_ID,
+        tenant_id: getTenantIdOrDefault(context.tenantId, "BaseAgent.log"),
         job_id: context.jobId ?? null,
         user_id: context.userId ?? null,
         action: this.role,

@@ -2,6 +2,7 @@
 
 import { getAdminClient } from "@/lib/supabase/admin";
 import { runAgent } from "@/lib/agents/runAgent";
+import { nova } from "@/lib/agents/nova";
 import type {
   AutomationPayload,
   AutomationQueueItem,
@@ -45,7 +46,27 @@ export async function handleTessTerritory(
     date: new Date().toISOString(),
   });
 
-  const tessData = tessResult.data as Record<string, unknown> | null;
+  // ── NOVA: per-territory market demand/supply/expansion intelligence ──
+  // Same cron trigger as TESS's territory analysis — extends the existing
+  // daily_territory_analysis handler rather than adding a new schedule.
+  // Each compute* call persists its own market_demand/market_supply/
+  // market_metrics/market_opportunities snapshot as a side effect.
+  const { data: activeTerritories } = await db
+    .from("franchise_territories")
+    .select("id, name")
+    .eq("status", "active");
+
+  const novaSummaries: Array<{ territoryId: string; name: string; opportunityCount: number }> = [];
+  for (const territory of activeTerritories ?? []) {
+    await nova.assessMarketDemand(territory.id);
+    await nova.assessMarketSupply(territory.id);
+    const opportunities = await nova.recommendExpansionOpportunities(territory.id);
+    novaSummaries.push({
+      territoryId: territory.id,
+      name: territory.name,
+      opportunityCount: opportunities.opportunities?.length ?? 0,
+    });
+  }
 
   // Log to agent_logs (already done inside runAgent)
   // Store summary in audit_logs
@@ -58,6 +79,7 @@ export async function handleTessTerritory(
       jobs_analyzed: recentJobs?.length ?? 0,
       providers_analyzed: providers?.length ?? 0,
       tess_output: tessResult.data,
+      nova_territories_analyzed: novaSummaries,
     },
   });
 
@@ -68,6 +90,7 @@ export async function handleTessTerritory(
       jobs_analyzed: recentJobs?.length ?? 0,
       unfilled_by_category: unfilledByCategory,
       tess_summary: tessResult.data,
+      nova_territories_analyzed: novaSummaries,
     },
   };
 }

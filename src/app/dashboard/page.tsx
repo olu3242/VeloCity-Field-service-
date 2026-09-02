@@ -2,8 +2,10 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatCard } from "@/components/ui/stat-card";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   JOB_STATUS_LABELS,
   JOB_STATUS_COLORS,
@@ -12,6 +14,8 @@ import {
   formatDateTime,
 } from "@/lib/utils";
 import type { Job } from "@/types";
+import { computeCustomerMembershipSummary } from "@/lib/membership/customerMembershipSummary";
+import { computeCommercialAccountSummary } from "@/lib/commercial/commercialAccountSummary";
 
 export default async function CustomerDashboard() {
   const supabase = await createClient();
@@ -41,6 +45,20 @@ export default async function CustomerDashboard() {
     !["completed", "closed", "cancelled", "expired", "refunded"].includes(j.status)
   );
 
+  const memberships = await computeCustomerMembershipSummary(user.id);
+
+  // Commercial Account view (Batch X+3, Phase 11): extends this same
+  // dashboard for customers who are also the primary contact of a
+  // commercial account — no separate commercial portal.
+  const { data: commercialAccountRow } = await supabase
+    .from("commercial_accounts")
+    .select("id")
+    .eq("primary_contact_id", user.id)
+    .maybeSingle();
+  const commercialAccount = commercialAccountRow
+    ? await computeCommercialAccountSummary(commercialAccountRow.id)
+    : null;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top nav */}
@@ -58,32 +76,112 @@ export default async function CustomerDashboard() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">My Dashboard</h1>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-velocity-700">{activeJobs?.length ?? 0}</div>
-              <div className="text-sm text-gray-500 mt-1">Active Jobs</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-gray-900">
-                {jobs?.filter((j) => j.status === "completed").length ?? 0}
-              </div>
-              <div className="text-sm text-gray-500 mt-1">Completed</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-gray-900">
-                {formatCents(
-                  jobs?.reduce((sum, j) => sum + (j.final_cost_cents ?? j.quoted_cost_cents ?? 0), 0) ?? 0
-                )}
-              </div>
-              <div className="text-sm text-gray-500 mt-1">Total Spent</div>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <StatCard
+            label="Active Jobs"
+            value={activeJobs?.length ?? 0}
+            valueClassName="text-velocity-700"
+          />
+          <StatCard
+            label="Completed"
+            value={jobs?.filter((j) => j.status === "completed").length ?? 0}
+          />
+          <StatCard
+            label="Total Spent"
+            value={formatCents(
+              jobs?.reduce((sum, j) => sum + (j.final_cost_cents ?? j.quoted_cost_cents ?? 0), 0) ?? 0
+            )}
+          />
         </div>
+
+        {/* Memberships (Batch X+2, Phase 11) */}
+        {memberships.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">My Memberships</h2>
+            <div className="space-y-3">
+              {memberships.map((m) => (
+                <Card key={m.subscriptionId}>
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-medium">{m.planName}</div>
+                      <Badge className={m.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}>
+                        {m.status}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-gray-500 mb-3">
+                      {m.billingFrequency} billing • renews {formatDateTime(m.currentPeriodEnd)}
+                      {m.nextServiceDate ? ` • next service ${m.nextServiceDate}` : ""}
+                    </div>
+                    <div className="space-y-1 mb-3">
+                      {m.entitlements.map((e) => (
+                        <div key={e.entitlementId} className="text-xs text-gray-500 flex items-center justify-between">
+                          <span>
+                            {e.serviceTypeName}
+                            {e.isPriorityScheduling ? " (priority scheduling)" : ""}
+                          </span>
+                          <span>
+                            {e.includedUsesPerPeriod === null
+                              ? `${e.usedThisPeriod} used (unlimited)`
+                              : `${e.usedThisPeriod}/${e.includedUsesPerPeriod} used`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-sm font-medium text-velocity-700">
+                      Savings realized this period: {formatCents(m.savingsRealizedCents)}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Commercial Account (Batch X+3, Phase 11) */}
+        {commercialAccount && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold mb-4">My Commercial Account</h2>
+            <Card>
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="font-medium">{commercialAccount.name}</div>
+                  <Badge className={commercialAccount.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}>
+                    {commercialAccount.status}
+                  </Badge>
+                </div>
+                <div className="text-sm text-gray-500 mb-3">
+                  {commercialAccount.locationCount} location(s) · {commercialAccount.jobCount} job(s) · {formatCents(commercialAccount.realizedRevenueCents)} realized
+                </div>
+                <div className="space-y-3">
+                  {commercialAccount.activeContracts.map((contract) => (
+                    <div key={contract.contractId} className="rounded-lg border p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium capitalize">{contract.contractType.replace(/_/g, " ")} contract</span>
+                        <Badge className={contract.status === "active" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}>
+                          {contract.status}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatCents(contract.contractValueCents)} ({contract.billingFrequency}) · renews {contract.endDate ?? "ongoing"}
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {contract.servicePlans.map((plan, i) => (
+                          <div key={i} className="text-xs text-gray-500 flex items-center justify-between">
+                            <span>{plan.serviceTypeName}</span>
+                            <span>{plan.includedUsesPerPeriod === null ? "unlimited" : `${plan.includedUsesPerPeriod}/${plan.period}`}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  {!commercialAccount.activeContracts.length && (
+                    <p className="text-sm text-gray-500">No active contracts.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Active Jobs */}
         {activeJobs && activeJobs.length > 0 && (
@@ -129,14 +227,12 @@ export default async function CustomerDashboard() {
           </div>
 
           {!jobs?.length ? (
-            <Card>
-              <CardContent className="py-16 text-center">
-                <p className="text-gray-500 mb-4">No jobs yet. Book your first service!</p>
-                <Button asChild>
-                  <Link href="/book">Book a Service</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon="🧰"
+              title="No jobs yet"
+              description="Book your first service and we'll match you with a verified local provider."
+              action={{ label: "Book a Service", href: "/book" }}
+            />
           ) : (
             <div className="space-y-2">
               {jobs.map((job: Job) => (

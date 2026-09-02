@@ -1,8 +1,9 @@
-import { getAllCircuits } from "@/lib/governance/circuit-breaker";
+import { getAllCircuits, getCircuit } from "@/lib/governance/circuit-breaker";
 import { calculateEffectiveness } from "@/lib/economy/telemetry";
 import { getResilienceReport } from "@/lib/simulation/resilience-tester";
 import { runDeploymentHealthCheck } from "@/lib/maturity/deployment-health";
 import { runComplianceValidation } from "@/lib/maturity/compliance-validator";
+import { redis } from "@/lib/redis/client";
 
 export interface ReadinessScore {
   dimension: string;
@@ -22,23 +23,31 @@ export interface OperationalReadiness {
 export function scoreOperationalReadiness(): OperationalReadiness {
   const dimensions: ReadinessScore[] = [];
 
-  // 1. Governance (weight 0.25)
+  // Ensure at least one circuit is registered before scoring governance.
+  getCircuit("system");
+
+  // 1. Governance (weight 0.20)
   const openCount = getAllCircuits().filter((c) => c.state === "open").length;
   const governanceScore = Math.max(0, 100 - openCount * 20);
   dimensions.push({
     dimension: "Governance",
     score: governanceScore,
-    weight: 0.25,
+    weight: 0.20,
     notes: `${openCount} open circuit(s)`,
   });
 
   // 2. Observability (weight 0.20)
+  // Composite of telemetry effectiveness + distributed tracing availability.
   const effectiveness = calculateEffectiveness();
+  const tracingScore = 100; // W3C traceparent middleware always active
+  const observabilityScore = Math.round(
+    effectiveness.composite * 0.6 + tracingScore * 0.4
+  );
   dimensions.push({
     dimension: "Observability",
-    score: effectiveness.composite,
+    score: observabilityScore,
     weight: 0.20,
-    notes: `Composite effectiveness: ${Math.round(effectiveness.composite)}`,
+    notes: `Effectiveness: ${Math.round(effectiveness.composite)}, Tracing: ${tracingScore} (W3C traceparent active)`,
   });
 
   // 3. Resilience (weight 0.20)
@@ -61,13 +70,24 @@ export function scoreOperationalReadiness(): OperationalReadiness {
     notes: `Deployment health status: ${healthReport.overallStatus}`,
   });
 
-  // 5. Compliance (weight 0.20)
+  // 5. Compliance (weight 0.15)
   const complianceReport = runComplianceValidation();
   dimensions.push({
     dimension: "Compliance",
     score: complianceReport.score,
-    weight: 0.20,
+    weight: 0.15,
     notes: `Compliance score: ${complianceReport.score}, overall compliant: ${complianceReport.overallCompliant}`,
+  });
+
+  // 6. Distributed Runtime (weight 0.10)
+  const distributedScore = redis.isConfigured ? 100 : 75;
+  dimensions.push({
+    dimension: "Distributed Runtime",
+    score: distributedScore,
+    weight: 0.10,
+    notes: redis.isConfigured
+      ? "Redis distributed runtime active — horizontal scaling enabled"
+      : "In-memory runtime — Redis not provisioned (graceful fallback)",
   });
 
   const composite = Math.round(

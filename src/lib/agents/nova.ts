@@ -2,6 +2,22 @@
 import { BaseAgent, type AgentContext } from "./base";
 import type { Job, JobStatus } from "@/types";
 import { hasEnv } from "@/lib/env";
+import {
+  computeMembershipGrowthIntelligence,
+  type MembershipGrowthReport,
+} from "@/lib/membership/membershipGrowthIntelligence";
+import {
+  computeMarketDemand,
+  type MarketDemandCategoryReport,
+} from "@/lib/expansion/marketDemandIntelligence";
+import {
+  computeMarketSupply,
+  type MarketSupplyCategoryReport,
+} from "@/lib/expansion/marketSupplyIntelligence";
+import {
+  computeMarketOpportunities,
+  type MarketOpportunityReport,
+} from "@/lib/expansion/marketOpportunityIntelligence";
 
 export interface NovaTransitionOutput {
   allowed: boolean;
@@ -115,6 +131,44 @@ What reminders should be sent and when? Respond with JSON.`;
 
     const result = await this.run<NovaReminderOutput>(prompt, context);
     return result.success ? (result.data ?? null) : null;
+  }
+
+  /**
+   * Cross-sell/upsell/plan-upgrade/expansion membership opportunities for a
+   * customer, read-time from real job history, membership_usage, and
+   * membership_plan_pricing. No new growth engine — delegates entirely to
+   * membershipGrowthIntelligence.ts.
+   */
+  async recommendMembershipGrowth(customerId: string, tenantId: string): Promise<MembershipGrowthReport> {
+    return computeMembershipGrowthIntelligence(customerId, tenantId);
+  }
+
+  /**
+   * Demand Intelligence (Batch X+3) — per-category job demand for a
+   * franchise territory, read-time from real `jobs` rows. Persists a
+   * market_demand snapshot as a side effect.
+   */
+  async assessMarketDemand(territoryId: string): Promise<MarketDemandCategoryReport[]> {
+    return computeMarketDemand(territoryId);
+  }
+
+  /**
+   * Supply Intelligence (Batch X+3) — per-category active provider supply
+   * for a franchise territory, read-time from real `providers`/
+   * `service_areas` rows. Persists a market_supply snapshot as a side effect.
+   */
+  async assessMarketSupply(territoryId: string): Promise<MarketSupplyCategoryReport[]> {
+    return computeMarketSupply(territoryId);
+  }
+
+  /**
+   * Expansion opportunities for a franchise territory — combines demand and
+   * supply intelligence with the existing territoryOpportunityScore/
+   * supplyGapAnalysis pure functions, with expected revenue impact.
+   * Persists market_metrics/market_opportunities as a side effect.
+   */
+  async recommendExpansionOpportunities(territoryId: string): Promise<MarketOpportunityReport> {
+    return computeMarketOpportunities(territoryId);
   }
 }
 

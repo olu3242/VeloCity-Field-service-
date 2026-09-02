@@ -4,6 +4,7 @@ import { ivy } from "@/lib/agents/ivy";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
 import { buildEvidenceBundle } from "@/lib/disputes/buildEvidenceBundle";
+import { observe } from "@/lib/idxf-integration/shadow-validator";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -33,6 +34,14 @@ export async function POST(request: NextRequest) {
     job.payments ?? [],
     undefined,
     { jobId: job_id, tenantId }
+  );
+
+  // IDXF shadow validation — observation only, never blocking. Reaching here
+  // means the route's own job-ownership check passed.
+  observe(
+    "dispute",
+    { job_id, status: "open" },
+    { tenantId, legacyAccepted: true, source: "api.disputes.create" }
   );
 
   const { data: dispute, error } = await supabase

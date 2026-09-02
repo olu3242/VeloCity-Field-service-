@@ -2,6 +2,7 @@
 
 import { getAdminClient } from "@/lib/supabase/admin";
 import { emitEvent } from "../emitEvent";
+import { storeEnterpriseMemory } from "@/lib/enterprise-memory";
 import type {
   AutomationPayload,
   AutomationQueueItem,
@@ -106,6 +107,19 @@ export async function handleSLACheck(
       body: "Our team is personally handling your request. A support specialist will reach out within 30 minutes.",
       channel: "in_app",
       metadata: { job_id, escalated: true },
+    });
+
+    await storeEnterpriseMemory({
+      tenantId: (payload as unknown as Record<string, string>).tenant_id ?? "default",
+      category: "incident",
+      entityType: "job",
+      entityId: job_id,
+      actorType: "system",
+      actorId: "sla-check",
+      summary: `SLA escalation for job ${job_id}: ${(payload.reason as string) ?? "no_provider_after_3_attempts"}`,
+      detail: { job_id, reason: payload.reason, job_status: job.status },
+      tags: ["sla", "escalation", "incident"],
+      importance: "high",
     });
 
     return { success: true, output: { job_id, action: "escalated_to_admin" } };

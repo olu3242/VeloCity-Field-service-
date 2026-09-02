@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
+import { getTenantIdOrDefault } from "@/lib/tenancy";
 import type { UserRole } from "@/types";
 
 export interface ResolvedUser {
@@ -37,7 +37,7 @@ export async function resolveIdentity(supabase: SupabaseClient): Promise<Resolve
       id: user.id,
       email: user.email,
       role: (profile?.role as UserRole) ?? "customer",
-      tenantId: profile?.tenant_id ?? DEFAULT_TENANT_ID,
+      tenantId: getTenantIdOrDefault(profile?.tenant_id, "resolveIdentity/resolveUser"),
       organizationId: profile?.organization_id ?? null,
       franchiseId: profile?.franchise_id ?? null,
       fullName: profile?.full_name ?? null,
@@ -60,7 +60,7 @@ export async function resolveUser(supabase: SupabaseClient): Promise<{ id: strin
   return {
     id: user.id,
     role: (profile?.role as UserRole) ?? "customer",
-    tenantId: profile?.tenant_id ?? DEFAULT_TENANT_ID,
+    tenantId: getTenantIdOrDefault(profile?.tenant_id, "resolveIdentity/resolveUser"),
   };
 }
 
@@ -79,7 +79,7 @@ export async function resolveTenant(supabase: SupabaseClient, userId: string): P
     .select("tenant_id")
     .eq("id", userId)
     .maybeSingle();
-  return profile?.tenant_id ?? DEFAULT_TENANT_ID;
+  return getTenantIdOrDefault(profile?.tenant_id, "resolveIdentity/resolveUser");
 }
 
 /** Portal routing map — canonical source of truth */

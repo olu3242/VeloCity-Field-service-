@@ -1,5 +1,7 @@
 // FINN — Finance & Payment Monitoring Agent
 import { BaseAgent, type AgentContext } from "./base";
+import { generateQuoteIntelligence, type QuoteIntelligenceResult } from "@/lib/pricing/quoteIntelligence";
+import type { PricingInput } from "@/lib/pricing/types";
 import type { Payment, Job } from "@/types";
 
 export interface FinnPayoutOutput {
@@ -104,6 +106,16 @@ Identify anomalies and provide reconciliation report. Respond with JSON.`;
 
     const result = await this.run<FinnReconciliationOutput>(prompt, context);
     return result.success ? (result.data ?? null) : null;
+  }
+
+  /**
+   * Margin/revenue projection for a job before it's quoted, via the
+   * existing pricing engine (calculatePrice → generateQuoteIntelligence).
+   * No new pricing logic — this just surfaces the margin/recommended-quote
+   * figures the pricing engine already computes, for FINN's revenue view.
+   */
+  estimateJobEconomics(input: PricingInput): QuoteIntelligenceResult {
+    return generateQuoteIntelligence(input);
   }
 }
 

@@ -8,6 +8,14 @@ export type PricingMode =
   | "subscription_recurring"
   | "emergency_dynamic";
 
+export interface PricingProfile {
+  base_price_cents: number;
+  labor_rate_cents: number;
+  travel_fee_cents: number;
+  urgency_multiplier: number;
+  commercial_multiplier: number;
+}
+
 export interface PricingInput {
   category: ServiceCategory;
   urgency: UrgencyLevel;
@@ -20,6 +28,11 @@ export interface PricingInput {
   quotedAmountCents?: number;
   subscription?: boolean;
   emergencyCapMultiplier?: number;
+  isCommercial?: boolean;
+  /** Optional service_pricing_profiles row, fetched by the caller. When
+   * present, overrides the hardcoded CATEGORY_BASE_PRICE_CENTS/labor rate.
+   * Falls back to the existing hardcoded pricing rules when absent. */
+  pricingProfile?: PricingProfile;
 }
 
 export interface PricingResult {

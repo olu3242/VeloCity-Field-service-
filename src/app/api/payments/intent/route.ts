@@ -4,6 +4,7 @@ import { hasEnvGroup } from "@/lib/env";
 import { paymentIntentSchema, validationError } from "@/lib/validation";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
+import { observe } from "@/lib/idxf-integration/shadow-validator";
 import { createVelocityPaymentIntent, calculatePlatformFee } from "@/lib/payments";
 import { checkPermission } from "@/lib/access";
 
@@ -33,8 +34,7 @@ export async function POST(request: NextRequest) {
     : await createVelocityPaymentIntent({ amountCents: amount_cents, customerId: user.id, jobId: job_id, type, tenantId });
   const platformFeeCents = calculatePlatformFee(amount_cents);
 
-  // Record payment intent in DB
-  const { data: payment } = await supabase.from("payments").insert({
+  const paymentInsert = {
     job_id,
     tenant_id: tenantId,
     customer_id: user.id,
@@ -46,7 +46,24 @@ export async function POST(request: NextRequest) {
     status: "pending",
     type,
     metadata: {},
-  }).select("id").single();
+  };
+
+  // IDXF shadow validation — observation only, never blocking. This is the
+  // highest-value path to compare: the payment entity declares a
+  // provider_payout_cents formula and a payout-ceiling business rule, so any
+  // divergence here is a genuine financial-consistency signal.
+  observe("payment", paymentInsert, {
+    tenantId,
+    legacyAccepted: true,
+    source: "api.payments.intent",
+  });
+
+  // Record payment intent in DB
+  const { data: payment } = await supabase
+    .from("payments")
+    .insert(paymentInsert)
+    .select("id")
+    .single();
 
   await supabase.from("payment_ledger").insert({
     tenant_id: tenantId,

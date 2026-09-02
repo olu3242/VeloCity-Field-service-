@@ -2,6 +2,8 @@
 
 import { getAdminClient } from "@/lib/supabase/admin";
 import { runAgent } from "@/lib/agents/runAgent";
+import { computeProviderSkill } from "@/lib/skills/computeProviderSkills";
+import { evaluateProviderCertification } from "@/lib/certifications/evaluateCertifications";
 import { emitEvent } from "../emitEvent";
 import type {
   AutomationPayload,
@@ -42,6 +44,26 @@ export async function handleRexCompletion(
       .from("providers")
       .update({ trust_score: rexData.new_trust_score })
       .eq("id", provider_id);
+  }
+
+  // ── Recompute Skills Graph + Certification Intelligence ──
+  // Evidence-derived only (Rule 2): reads real jobs/reviews/offers, never
+  // assigns a score manually. Recomputed on every completion event since
+  // job status (and therefore the evidence set) changes between
+  // job_completed and customer_confirmed.
+  if (provider_id) {
+    const { data: jobRow } = await db
+      .from("jobs")
+      .select("service_type_id, category")
+      .eq("id", job_id)
+      .single();
+
+    if (jobRow?.service_type_id) {
+      await computeProviderSkill(provider_id, jobRow.service_type_id);
+    }
+    if (jobRow?.category) {
+      await evaluateProviderCertification(provider_id, jobRow.category);
+    }
   }
 
   // ── Request review from customer ─────────────────────────

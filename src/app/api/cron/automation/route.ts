@@ -3,6 +3,7 @@ import { authorizeCron } from "@/lib/cron/auth";
 import { createAdminClient } from "@/lib/supabase/server";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { processAutomationQueue } from "@/lib/automation/worker";
+import { getTenantIdOrDefault } from "@/lib/tenancy";
 
 const ACTIVE_STATUSES = ["submitted", "awaiting_match", "offer_sent", "accepted", "scheduled", "en_route", "arrived", "diagnosis_in_progress", "in_progress"];
 
@@ -22,10 +23,12 @@ async function runAutomationCron(request: NextRequest) {
   const now = new Date();
   const bucket = now.toISOString().slice(0, 16);
   const emitted: string[] = [];
+  const tenantId = getTenantIdOrDefault(null, "cron:automation");
 
   const { data: expiredOffers } = await supabase
     .from("provider_offers")
     .select("id,job_id,provider_id,expires_at")
+    .eq("tenant_id", tenantId)
     .is("accepted_at", null)
     .is("rejected_at", null)
     .lt("expires_at", now.toISOString())
@@ -51,6 +54,7 @@ async function runAutomationCron(request: NextRequest) {
   const { data: slaJobs } = await supabase
     .from("jobs")
     .select("id,status,urgency,category,customer_id,provider_id,created_at,title")
+    .eq("tenant_id", tenantId)
     .in("status", ACTIVE_STATUSES)
     .eq("urgency", "emergency")
     .lt("created_at", oneHourAgo)
@@ -72,6 +76,7 @@ async function runAutomationCron(request: NextRequest) {
   const { data: stuckJobs } = await supabase
     .from("jobs")
     .select("id,status,urgency,category,customer_id,provider_id,updated_at,title")
+    .eq("tenant_id", tenantId)
     .in("status", ACTIVE_STATUSES)
     .lt("updated_at", dayAgo)
     .limit(25);
@@ -91,6 +96,7 @@ async function runAutomationCron(request: NextRequest) {
   const { data: failedPayments } = await supabase
     .from("payments")
     .select("id,job_id,customer_id,amount_cents,status,type")
+    .eq("tenant_id", tenantId)
     .eq("status", "failed")
     .limit(25);
 
@@ -110,6 +116,7 @@ async function runAutomationCron(request: NextRequest) {
   const { data: unsentNotifications } = await supabase
     .from("notifications")
     .select("id,user_id,channel,title,created_at")
+    .eq("tenant_id", tenantId)
     .is("sent_at", null)
     .lt("created_at", fifteenMinutesAgo)
     .limit(25);
@@ -129,6 +136,7 @@ async function runAutomationCron(request: NextRequest) {
   const { data: payoutPayments } = await supabase
     .from("payments")
     .select("id,job_id,provider_id,amount_cents,status")
+    .eq("tenant_id", tenantId)
     .in("status", ["captured", "escrowed"])
     .limit(25);
 

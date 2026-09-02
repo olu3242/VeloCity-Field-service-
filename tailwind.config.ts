@@ -73,6 +73,11 @@ const config: Config = {
         "velocity-carbon": "#111827",
         "velocity-white": "#F9FAFB",
       },
+      fontFamily: {
+        display: ["var(--font-display)", "Bebas Neue", "sans-serif"],
+        body:    ["var(--font-body)",    "DM Sans",    "system-ui", "sans-serif"],
+        mono:    ["var(--font-mono)",    "Space Mono", "ui-monospace", "monospace"],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

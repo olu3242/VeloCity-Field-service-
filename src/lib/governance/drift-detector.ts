@@ -14,7 +14,7 @@ export interface DriftItem {
   detected_at: string;
 }
 
-export async function detectDrift(db: SupabaseClient): Promise<DriftItem[]> {
+export async function detectDrift(db: SupabaseClient, tenantId: string): Promise<DriftItem[]> {
   const drifts: DriftItem[] = [];
   const now = new Date().toISOString();
 
@@ -49,6 +49,7 @@ export async function detectDrift(db: SupabaseClient): Promise<DriftItem[]> {
       const { count: stuckJobs } = await db
         .from("jobs")
         .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("status", "awaiting_match")
         .lt("created_at", new Date(Date.now() - 4 * 3600 * 1000).toISOString());
       if ((stuckJobs ?? 0) > 0) {
@@ -58,6 +59,7 @@ export async function detectDrift(db: SupabaseClient): Promise<DriftItem[]> {
       const { count: deadLetterCount } = await db
         .from("automation_queue")
         .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("status", "dead_letter");
       if ((deadLetterCount ?? 0) > 0) {
         drifts.push({ id: "data-dead-letter", category: "event", severity: "high", description: `${deadLetterCount} events in dead letter queue`, affected: "Automation Runtime", remediation: "Review and replay events via /api/admin/runtime", detected_at: now });
@@ -66,6 +68,7 @@ export async function detectDrift(db: SupabaseClient): Promise<DriftItem[]> {
       const { count: failedAutomations } = await db
         .from("automation_queue")
         .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
         .eq("status", "failed")
         .gte("created_at", new Date(Date.now() - 3600 * 1000).toISOString());
       if ((failedAutomations ?? 0) > 5) {

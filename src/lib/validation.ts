@@ -69,6 +69,8 @@ export const bookingSchema = z.object({
   preferred_time_start: z.string().trim().optional(),
   preferred_time_end: z.string().trim().optional(),
   photo_urls: z.array(z.string().url()).default([]),
+  service_type_id: z.string().uuid().optional().nullable(),
+  service_package_id: z.string().uuid().optional().nullable(),
 });
 
 export const tenantSchema = z.object({
@@ -89,6 +91,8 @@ export const providerApplicationSchema = z.object({
   bio: z.string().trim().max(2000).optional().nullable(),
   years_experience: z.number().int().min(0).max(80),
 });
+
+export const providerProfileUpdateSchema = providerApplicationSchema.partial();
 
 export const providerApprovalSchema = z.object({
   provider_id: z.string().uuid(),
@@ -246,4 +250,157 @@ export function validationError(error: unknown) {
     };
   }
   return { error: "Invalid request body" };
+}
+
+// ---------------------------------------------------------------------------
+// Plain-TypeScript runtime validators (no Zod, safe for edge/worker contexts)
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown by `validateBody` when a field fails its rule.
+ * Consumers can inspect `.field` and `.rule` to build structured error
+ * responses without depending on Zod's shape.
+ */
+export class ValidationError extends Error {
+  constructor(
+    public field: string,
+    public rule: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
+export interface ValidationRule<T> {
+  validate(value: unknown): value is T;
+  message: string;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const URL_RE = /^https?:\/\/.+/;
+
+export const validators = {
+  /** Any string (including empty). */
+  string(): ValidationRule<string> {
+    return {
+      validate(value): value is string {
+        return typeof value === "string";
+      },
+      message: "must be a string",
+    };
+  },
+
+  /** Non-empty string after trimming. */
+  nonEmptyString(): ValidationRule<string> {
+    return {
+      validate(value): value is string {
+        return typeof value === "string" && value.trim().length > 0;
+      },
+      message: "must be a non-empty string",
+    };
+  },
+
+  /** UUID v4 format. */
+  uuid(): ValidationRule<string> {
+    return {
+      validate(value): value is string {
+        return typeof value === "string" && UUID_RE.test(value);
+      },
+      message: "must be a valid UUID v4",
+    };
+  },
+
+  /** Integer greater than zero. */
+  positiveInteger(): ValidationRule<number> {
+    return {
+      validate(value): value is number {
+        return (
+          typeof value === "number" &&
+          Number.isFinite(value) &&
+          Number.isInteger(value) &&
+          value > 0
+        );
+      },
+      message: "must be a positive integer",
+    };
+  },
+
+  /** Basic e-mail format. */
+  email(): ValidationRule<string> {
+    return {
+      validate(value): value is string {
+        return typeof value === "string" && EMAIL_RE.test(value);
+      },
+      message: "must be a valid email address",
+    };
+  },
+
+  /** http:// or https:// URL. */
+  url(): ValidationRule<string> {
+    return {
+      validate(value): value is string {
+        return typeof value === "string" && URL_RE.test(value);
+      },
+      message: "must be a valid URL starting with http:// or https://",
+    };
+  },
+
+  /** Value must be one of the provided string literals. */
+  enum<T extends string>(values: readonly T[]): ValidationRule<T> {
+    const set = new Set<string>(values);
+    return {
+      validate(value): value is T {
+        return typeof value === "string" && set.has(value);
+      },
+      message: `must be one of: ${values.join(", ")}`,
+    };
+  },
+
+  /**
+   * Wraps another validator to also allow `undefined` (field may be absent).
+   * `null` is NOT treated as `undefined`.
+   */
+  optional<T>(inner: ValidationRule<T>): ValidationRule<T | undefined> {
+    return {
+      validate(value): value is T | undefined {
+        return value === undefined || inner.validate(value);
+      },
+      message: `(optional) ${inner.message}`,
+    };
+  },
+};
+
+/**
+ * Validate an arbitrary request body against a typed schema.
+ * Throws `ValidationError` on the first failing field.
+ *
+ * @example
+ * const body = validateBody(await req.json(), {
+ *   jobId:  validators.uuid(),
+ *   amount: validators.positiveInteger(),
+ *   status: validators.enum(["pending", "completed"] as const),
+ * });
+ */
+export function validateBody<T extends Record<string, unknown>>(
+  body: unknown,
+  schema: { [K in keyof T]: ValidationRule<T[K]> },
+): T {
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    throw new ValidationError("body", "object", "Request body must be a JSON object");
+  }
+
+  const input = body as Record<string, unknown>;
+
+  for (const key of Object.keys(schema) as Array<keyof T & string>) {
+    const rule = schema[key];
+    const value = input[key];
+
+    if (!rule.validate(value)) {
+      throw new ValidationError(key, rule.message, `Field "${key}": ${rule.message}`);
+    }
+  }
+
+  return input as T;
 }

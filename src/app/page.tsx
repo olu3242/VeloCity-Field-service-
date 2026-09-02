@@ -1,39 +1,81 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { OriginalLandingPage } from "@/components/landing/original-landing-page";
+import { getAdminClient } from "@/lib/supabase/admin";
+import { hasEnvGroup } from "@/lib/env";
+import { SERVICE_CATEGORY_LABELS } from "@/lib/utils";
+import { LandingPage, type LandingStats, type LandingTestimonial } from "@/components/landing/LandingPage";
 
-function extractFirstMatch(source: string, pattern: RegExp) {
-  return source.match(pattern)?.[1] ?? "";
-}
+export const dynamic = "force-dynamic";
 
-function mapLandingLinks(markup: string) {
-  let nextBookHref = 0;
-  let nextProviderHref = 0;
-  return markup.replace(/href="#"/g, () => {
-    nextBookHref += 1;
-    if (nextBookHref === 1) return 'href="/"';
-    if (nextBookHref === 2) return 'href="/auth/login"';
-    if (nextBookHref === 3) return 'href="/book"';
-    if (nextBookHref === 4) return 'href="/book"';
-    nextProviderHref += 1;
-    if (nextProviderHref === 1) return 'href="/provider/apply"';
-    return 'href="/"';
-  });
-}
+const CATEGORY_COUNT = Object.keys(SERVICE_CATEGORY_LABELS).length;
+
+const EMPTY_STATS: LandingStats = {
+  activeJobsToday: 0,
+  completedJobs: 0,
+  providerCount: 0,
+  avgRating: null,
+  reviewCount: 0,
+  categoryCount: CATEGORY_COUNT,
+};
 
 export default async function HomePage() {
-  const landingHtml = await readFile(
-    join(process.cwd(), "Landing page HTML for VeloCity Field Service"),
-    "utf8"
-  );
-  const styles = extractFirstMatch(landingHtml, /<style>([\s\S]*?)<\/style>/i);
-  const body = extractFirstMatch(landingHtml, /<body[^>]*>([\s\S]*?)<\/body>/i)
-    .replace(/<script>[\s\S]*?<\/script>/i, "");
+  if (!hasEnvGroup("supabase") || !hasEnvGroup("adminSupabase")) {
+    return <LandingPage stats={EMPTY_STATS} testimonials={[]} />;
+  }
 
-  return (
-    <OriginalLandingPage
-      styles={`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=Space+Mono:wght@400;700&display=swap');\n${styles}`}
-      bodyHtml={mapLandingLinks(body)}
-    />
-  );
+  const db = getAdminClient();
+
+  const [
+    { count: activeJobsToday },
+    { count: completedJobs },
+    { count: providerCount },
+    { data: reviews },
+  ] = await Promise.all([
+    db
+      .from("jobs")
+      .select("*", { count: "exact", head: true })
+      .not("status", "in", '("draft","completed","closed","cancelled","expired","refunded")')
+      .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+    db.from("jobs").select("*", { count: "exact", head: true }).in("status", ["completed", "closed"]),
+    db.from("providers").select("*", { count: "exact", head: true }).eq("status", "approved"),
+    db
+      .from("reviews")
+      .select("rating, comment, created_at, profiles!reviews_reviewer_id_fkey(full_name), jobs(category)")
+      .eq("is_public", true)
+      .not("comment", "is", null)
+      .neq("comment", "")
+      .gte("rating", 4)
+      .order("created_at", { ascending: false })
+      .limit(3),
+  ]);
+
+  const ratingAgg = await db.from("reviews").select("rating").eq("is_public", true);
+  const ratings = ratingAgg.data ?? [];
+  const avgRating = ratings.length
+    ? ratings.reduce((sum: number, r: { rating: number }) => sum + r.rating, 0) / ratings.length
+    : null;
+
+  const stats: LandingStats = {
+    activeJobsToday: activeJobsToday ?? 0,
+    completedJobs: completedJobs ?? 0,
+    providerCount: providerCount ?? 0,
+    avgRating,
+    reviewCount: ratings.length,
+    categoryCount: CATEGORY_COUNT,
+  };
+
+  const testimonials: LandingTestimonial[] = (reviews ?? [])
+    .map((r) => {
+      const profile = r.profiles as unknown as { full_name?: string } | null;
+      const job = r.jobs as unknown as { category?: string } | null;
+      if (!profile?.full_name || !r.comment) return null;
+      const [firstName, lastInitial] = profile.full_name.split(" ");
+      return {
+        quote: r.comment as string,
+        rating: r.rating as number,
+        author: `${firstName} ${lastInitial ? lastInitial[0] + "." : ""}`.trim(),
+        category: job?.category ?? "Service",
+      };
+    })
+    .filter((t): t is LandingTestimonial => t !== null);
+
+  return <LandingPage stats={stats} testimonials={testimonials} />;
 }

@@ -2,6 +2,7 @@
 
 import { getAdminClient } from "@/lib/supabase/admin";
 import { runAgent } from "@/lib/agents/runAgent";
+import { max } from "@/lib/agents/max";
 import { emitEvent } from "../emitEvent";
 import type {
   AutomationPayload,
@@ -55,10 +56,38 @@ export async function handleMaxDispatch(
     return { success: true, output: { job_id, dispatched: false, reason: "no_eligible_providers" } };
   }
 
+  // ── Commercial dispatch narrowing (Gold/Elite-only, SLA-aware) ────
+  // No-op for non-commercial jobs — assessCommercialDispatchPriority
+  // returns the full candidate pool unchanged when commercial_contract_id
+  // is absent.
+  const dispatchPriority = await max.assessCommercialDispatchPriority(
+    job_id,
+    providers.map((p) => p.id)
+  );
+  const eligibleProviders = dispatchPriority.isCommercial
+    ? providers.filter((p) => dispatchPriority.eligibleProviderIds.includes(p.id))
+    : providers;
+
+  if (dispatchPriority.isCommercial && eligibleProviders.length === 0) {
+    await db.from("notifications").insert({
+      user_id: job.customer_id,
+      type: "system_alert",
+      title: "Finding Your Provider",
+      body: "We're expanding our search to find the best provider for you. We'll notify you shortly.",
+      channel: "in_app",
+    });
+    await emitEvent(
+      "no_provider_accepted",
+      { job_id, attempt: 1, reason: "no_eligible_commercial_providers" },
+      `no_provider:${job_id}:1`
+    );
+    return { success: true, output: { job_id, dispatched: false, reason: "no_eligible_commercial_providers" } };
+  }
+
   // ── Run MAX ──────────────────────────────────────────────
   const maxResult = await runAgent("MAX", {
     job: { id: job_id, category, urgency, city, state, zip, description: job.description },
-    providers: providers.slice(0, 20), // MAX sees top 20
+    providers: eligibleProviders.slice(0, 20), // MAX sees top 20
     jobId: job_id,
   });
 
@@ -74,7 +103,7 @@ export async function handleMaxDispatch(
         .filter((p) => p.recommended)
         .slice(0, 3)
         .map((p) => p.provider_id)
-    : providers
+    : eligibleProviders
         .sort((a, b) => (b.trust_score ?? 0) - (a.trust_score ?? 0))
         .slice(0, 3)
         .map((p) => p.id);

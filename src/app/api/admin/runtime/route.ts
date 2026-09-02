@@ -21,17 +21,19 @@ async function assertAdmin() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if ((profile as { role?: string } | null)?.role !== "admin") return null;
-  return user;
+  const { data: profile } = await supabase.from("profiles").select("role, tenant_id").eq("id", user.id).single();
+  const row = profile as { role?: string; tenant_id?: string } | null;
+  if (row?.role !== "admin" || !row.tenant_id) return null;
+  return { user, tenantId: row.tenant_id };
 }
 
 export async function GET() {
-  const user = await assertAdmin();
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const admin = await assertAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { operator, circuitBreaker } = await getGovernance();
   const adminClient = getAdminClient();
+  const tenantId = admin.tenantId;
 
   // Queue health snapshot
   const [
@@ -41,13 +43,16 @@ export async function GET() {
   ] = await Promise.all([
     adminClient.from("automation_queue")
       .select("status")
+      .eq("tenant_id", tenantId)
       .gte("created_at", new Date(Date.now() - 3_600_000).toISOString()),
     adminClient.from("automation_runs")
       .select("status, completed_at, event_type")
+      .eq("tenant_id", tenantId)
       .order("completed_at", { ascending: false })
       .limit(5),
     adminClient.from("automation_queue")
       .select("event_type, error_message, created_at")
+      .eq("tenant_id", tenantId)
       .eq("status", "failed")
       .order("created_at", { ascending: false })
       .limit(10),
@@ -77,8 +82,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await assertAdmin();
-  if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const admin = await assertAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { user, tenantId } = admin;
 
   let body: Record<string, unknown>;
   try {
@@ -145,6 +151,7 @@ export async function POST(req: NextRequest) {
         .from("automation_events")
         .select("*")
         .eq("id", eventId)
+        .eq("tenant_id", tenantId)
         .single();
 
       if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -154,7 +161,7 @@ export async function POST(req: NextRequest) {
         event_id: eventId,
         event_type: ev.event_type,
         payload: ev.payload ?? {},
-        tenant_id: ev.tenant_id ?? null,
+        tenant_id: ev.tenant_id ?? tenantId,
         status: "pending",
         retry_count: 0,
         available_at: new Date().toISOString(),
@@ -168,6 +175,7 @@ export async function POST(req: NextRequest) {
 
   // Audit log the operator action
   await adminClient.from("audit_logs").insert({
+    tenant_id: tenantId,
     action: `operator:${action}`,
     actor_id: user.id,
     entity_type: "runtime",
