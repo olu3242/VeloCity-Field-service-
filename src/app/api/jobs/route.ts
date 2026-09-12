@@ -5,6 +5,7 @@ import { bookingSchema, validationError } from "@/lib/validation";
 import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
 import { validateServiceArea } from "@/lib/geo/validateServiceArea";
+import { syncJobOutcome } from "@/lib/outcomes";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -126,6 +127,8 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   try {
+    await syncJobOutcome({ supabase, jobId: job.id, tenantId });
+
     await emitEvent(supabase, {
       type: "service_request_created",
       source: "api.jobs.create",

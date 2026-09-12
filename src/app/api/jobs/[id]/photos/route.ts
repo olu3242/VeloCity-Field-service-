@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTenantId } from "@/lib/tenancy";
 import { uploadJobPhoto } from "@/lib/storage/uploadJobPhoto";
 import { photoUploadSchema, validationError } from "@/lib/validation";
+import { syncJobOutcome } from "@/lib/outcomes";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,5 +37,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const urls = Array.isArray(job.photo_urls) ? [...job.photo_urls, result.photo.url] : [result.photo.url];
   await supabase.from("jobs").update({ photo_urls: urls }).eq("tenant_id", tenantId).eq("id", id);
-  return NextResponse.json(result);
+  let outcome = null;
+  try {
+    outcome = await syncJobOutcome({ supabase, jobId: id, tenantId });
+  } catch {
+    // Evidence upload succeeded; the durable worker can repair the projection.
+  }
+  return NextResponse.json({ ...result, outcome });
 }

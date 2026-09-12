@@ -7,6 +7,7 @@ import { DEFAULT_TENANT_ID } from "@/lib/tenancy";
 import { routeGrowthAutomationEvent } from "./growthEvents";
 import type { AutomationEventType, AutomationRouteResult } from "./types";
 import type { AutomationQueueItem, AutomationPayload } from "@/types/automation";
+import { syncJobOutcome } from "@/lib/outcomes";
 
 // ── Handler imports ────────────────────────────────────────────────────────
 import { handleAliceIntake } from "./handlers/alice-intake";
@@ -267,6 +268,25 @@ export async function routeAutomationEvent(
     output: { actions, handled: true },
     error: null,
   }).then(() => null);
+
+  // Keep the durable business-outcome projection synchronized after every
+  // job-scoped event. A projection failure is observable but must not replay
+  // domain effects that already succeeded in the event handler.
+  if (jobId) {
+    try {
+      output.outcome = await syncJobOutcome({ supabase, jobId, tenantId });
+      actions.push("sync-job-outcome");
+    } catch (error) {
+      output.outcome_sync_error = error instanceof Error ? error.message : String(error);
+      await supabase.from("audit_logs").insert({
+        action: "job_outcome_sync_failed",
+        actor_id: null,
+        entity_type: "job",
+        entity_id: jobId,
+        metadata: { event_type: eventType, error: output.outcome_sync_error },
+      }).then(() => null);
+    }
+  }
 
   return { handled: true, actions, output };
 }

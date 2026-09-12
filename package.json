@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "jest --passWithNoTests",
+    "test": "npm run test:outcomes",
+    "test:outcomes": "node --test --experimental-strip-types tests/job-outcome-contract.test.mjs",
     "db:seed": "npx tsx supabase/seed.ts",
     "db:reset": "npx supabase db reset && npm run db:seed",
     "agents:test": "npx tsx src/lib/agents/test-agents.ts"

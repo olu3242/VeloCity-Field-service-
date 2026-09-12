@@ -8,6 +8,7 @@ import { emitEvent } from "@/lib/automation/emitEvent";
 import { getTenantId } from "@/lib/tenancy";
 import { calculateCancellationPolicy } from "@/lib/policies/cancellationRules";
 import type { JobStatus, UserRole } from "@/types";
+import { syncJobOutcome } from "@/lib/outcomes";
 
 export async function POST(
   request: NextRequest,
@@ -238,6 +239,8 @@ export async function POST(
         payload: basePayload,
       });
     }
+
+    await syncJobOutcome({ supabase, jobId: id, tenantId });
   } catch {
     // Automation failure must never block the API response.
   }

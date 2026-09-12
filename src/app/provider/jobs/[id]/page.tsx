@@ -7,6 +7,7 @@ import { JobTransitionButton } from "@/components/jobs/job-transition-button";
 import { CheckInButton } from "@/components/jobs/check-in-button";
 import { PhotoUploadForm } from "@/components/jobs/photo-upload-form";
 import { MessagePanel } from "@/components/jobs/message-panel";
+import { JobOutcomePanel } from "@/components/jobs/job-outcome-panel";
 import { getSlaStatus } from "@/lib/sla/slaStatus";
 import {
   JOB_STATUS_LABELS,
@@ -160,6 +161,7 @@ export default async function ProviderJobPage({
 
         <div className="grid md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-6">
+            <JobOutcomePanel jobId={job.id} />
             <Card>
               <CardHeader><CardTitle>Job Details</CardTitle></CardHeader>
               <CardContent className="space-y-4">

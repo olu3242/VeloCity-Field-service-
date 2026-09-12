@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessagePanel } from "@/components/jobs/message-panel";
+import { JobOutcomePanel } from "@/components/jobs/job-outcome-panel";
 import { getSlaStatus } from "@/lib/sla/slaStatus";
 import {
   JobAgentLogsList,
@@ -79,6 +80,10 @@ export default async function AdminJobDetailPage({ params }: { params: Promise<{
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{checkins?.length ?? 0}</div><div className="text-sm text-gray-500">GPS Check-ins</div></CardContent></Card>
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{photos?.length ?? 0}</div><div className="text-sm text-gray-500">Evidence Photos</div></CardContent></Card>
         <Card><CardContent className="pt-6"><div className="text-2xl font-bold">{messages?.length ?? 0}</div><div className="text-sm text-gray-500">Job Messages</div></CardContent></Card>
+      </section>
+
+      <section className="mb-6">
+        <JobOutcomePanel jobId={job.id} />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">

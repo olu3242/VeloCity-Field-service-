@@ -8,6 +8,7 @@ import { QuoteActions } from "@/components/jobs/quote-actions";
 import { TipProvider } from "@/components/jobs/tip-provider";
 import { MessagePanel } from "@/components/jobs/message-panel";
 import { PhotoUploadForm } from "@/components/jobs/photo-upload-form";
+import { JobOutcomePanel } from "@/components/jobs/job-outcome-panel";
 import { getSlaStatus } from "@/lib/sla/slaStatus";
 import {
   JOB_STATUS_LABELS,
@@ -99,6 +100,7 @@ export default async function JobDetailPage({
         <div className="grid md:grid-cols-3 gap-6">
           {/* Main details */}
           <div className="md:col-span-2 space-y-6">
+            <JobOutcomePanel jobId={job.id} />
             <Card>
               <CardHeader>
                 <CardTitle>Job Details</CardTitle>
