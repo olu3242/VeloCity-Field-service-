@@ -1,4 +1,4 @@
--- Migration 016: durable, versioned outcome contract for the standard service-job lifecycle.
+-- Durable, versioned outcome contract for the standard service-job lifecycle.
 -- The existing jobs FSM remains authoritative; this projection proves the business outcome.
 
 create table if not exists public.workflow_outcome_instances (
@@ -29,33 +29,38 @@ create index if not exists workflow_outcomes_human_action_idx
 
 alter table public.workflow_outcome_instances enable row level security;
 
+-- Explicit grants keep Data API exposure intentional as Supabase defaults evolve.
+revoke all on table public.workflow_outcome_instances from anon;
+grant select on table public.workflow_outcome_instances to authenticated;
+grant select, insert, update, delete on table public.workflow_outcome_instances to service_role;
+
 drop policy if exists "Customers see own job outcomes" on public.workflow_outcome_instances;
 create policy "Customers see own job outcomes"
-  on public.workflow_outcome_instances for select
+  on public.workflow_outcome_instances for select to authenticated
   using (exists (
     select 1 from public.jobs j
     where j.id = workflow_outcome_instances.job_id
       and j.tenant_id = workflow_outcome_instances.tenant_id
-      and j.customer_id = auth.uid()
+      and j.customer_id = (select auth.uid())
   ));
 
 drop policy if exists "Providers see assigned job outcomes" on public.workflow_outcome_instances;
 create policy "Providers see assigned job outcomes"
-  on public.workflow_outcome_instances for select
+  on public.workflow_outcome_instances for select to authenticated
   using (exists (
     select 1 from public.jobs j
     join public.providers p on p.id = j.provider_id
     where j.id = workflow_outcome_instances.job_id
       and j.tenant_id = workflow_outcome_instances.tenant_id
-      and p.user_id = auth.uid()
+      and p.user_id = (select auth.uid())
   ));
 
 drop policy if exists "Admins see tenant job outcomes" on public.workflow_outcome_instances;
 create policy "Admins see tenant job outcomes"
-  on public.workflow_outcome_instances for select
+  on public.workflow_outcome_instances for select to authenticated
   using (exists (
     select 1 from public.profiles p
-    where p.id = auth.uid()
+    where p.id = (select auth.uid())
       and p.role = 'admin'
       and p.tenant_id = workflow_outcome_instances.tenant_id
   ));
@@ -69,3 +74,4 @@ drop trigger if exists workflow_outcome_instances_updated_at on public.workflow_
 create trigger workflow_outcome_instances_updated_at
   before update on public.workflow_outcome_instances
   for each row execute function public.update_updated_at();
+
