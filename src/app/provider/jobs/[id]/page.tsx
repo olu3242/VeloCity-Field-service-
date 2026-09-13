@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -206,7 +207,13 @@ export default async function ProviderJobPage({
                     <div className="flex flex-wrap gap-2">
                       {(job.photo_urls as string[]).map((url, i) => (
                         <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                          <img src={url} alt={`Photo ${i + 1}`} className="h-20 w-20 rounded object-cover border" />
+                          <Image
+                            src={url}
+                            alt={`Customer photo ${i + 1}`}
+                            width={80}
+                            height={80}
+                            className="h-20 w-20 rounded border object-cover"
+                          />
                         </a>
                       ))}
                     </div>

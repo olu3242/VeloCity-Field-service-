@@ -24,4 +24,4 @@ Run the `Certification` workflow manually. It verifies anonymous isolation, cust
 
 ## 4. Go/no-go rule
 
-Go for a controlled internal pilot only when application CI and the manual pilot E2E job both pass, Supabase security advisors have no unresolved app-owned error findings, and Stripe remains in test mode. Any failed gate is a no-go until rerun successfully.
+Go for a controlled internal pilot only when application CI and the manual pilot E2E job both pass, `npm audit --omit=dev` reports zero vulnerabilities, Supabase security advisors have no unresolved app-owned error findings, and Stripe remains in test mode. Extension-owned PostGIS findings must be documented separately rather than changed blindly. Any failed gate is a no-go until rerun successfully.

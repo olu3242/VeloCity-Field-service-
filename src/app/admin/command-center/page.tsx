@@ -132,9 +132,12 @@ export default async function AdminCommandCenterPage() {
     personaCounts.set(label, (personaCounts.get(label) ?? 0) + 1);
   });
   const inactiveUsers = Math.max(0, (profiles?.length ?? 0) - (personaAssignments?.length ?? 0));
+  // Server-rendered operational snapshot; one timestamp keeps all comparisons consistent.
+  // eslint-disable-next-line react-hooks/purity
+  const renderedAt = Date.now();
   const highRiskUsers = deniedAccessAttempts.filter((log) => {
     const createdAt = new Date(log.created_at).getTime();
-    return Number.isFinite(createdAt) && Date.now() - createdAt < 7 * 24 * 60 * 60 * 1000;
+    return Number.isFinite(createdAt) && renderedAt - createdAt < 7 * 24 * 60 * 60 * 1000;
   }).length;
   const failedAutomations = (automationQueue ?? []).filter((item) => item.status === "failed" || Boolean(item.error_message));
   const automationRows = automationQueue ?? [];

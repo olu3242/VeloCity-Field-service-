@@ -26,14 +26,18 @@ export function ThemeProvider({
 
   // On mount, read persisted theme from localStorage
   useEffect(() => {
+    let initialization: number | undefined;
     try {
       const stored = localStorage.getItem("velocity-theme") as Theme | null;
       if (stored === "dark" || stored === "light") {
-        setThemeState(stored);
+        initialization = window.setTimeout(() => setThemeState(stored), 0);
       }
     } catch {
       // localStorage unavailable (SSR guard)
     }
+    return () => {
+      if (initialization !== undefined) window.clearTimeout(initialization);
+    };
   }, []);
 
   // Apply theme class to <html> and persist to localStorage whenever theme changes

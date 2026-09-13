@@ -72,6 +72,9 @@ export default async function LaxCommandCenter() {
 
   const db = getAdminClient();
   const envStatus = getEnvStatus();
+  // Freeze the server-rendered dashboard window to one consistent instant.
+  // eslint-disable-next-line react-hooks/purity
+  const oneHourAgo = new Date(Date.now() - 3_600_000).toISOString();
 
   // Parallel data fetch
   const [
@@ -91,7 +94,7 @@ export default async function LaxCommandCenter() {
   ] = await Promise.all([
     getRegistryData(),
     getDriftData(db),
-    db.from("automation_queue").select("status").gte("created_at", new Date(Date.now() - 3_600_000).toISOString()),
+    db.from("automation_queue").select("status").gte("created_at", oneHourAgo),
     db.from("automation_queue").select("event_type, error_message, created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(8),
     db.from("automation_runs").select("event_type, status, completed_at").order("completed_at", { ascending: false }).limit(6),
     db.from("agent_logs").select("agent_name, action, created_at").order("created_at", { ascending: false }).limit(6),

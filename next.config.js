@@ -7,9 +7,7 @@ const nextConfig = {
       { protocol: "https", hostname: "graph.facebook.com" },
     ],
   },
-  experimental: {
-    serverComponentsExternalPackages: ["@anthropic-ai/sdk"],
-  },
+  serverExternalPackages: ["@anthropic-ai/sdk"],
 };
 
 module.exports = nextConfig;

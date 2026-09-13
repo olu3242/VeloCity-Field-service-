@@ -12,10 +12,8 @@ async function assertAdmin() {
   return user;
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await assertAdmin();
   if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 interface Notification {
   id: string;
@@ -23,6 +24,7 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 export function NotificationBell() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -36,9 +38,12 @@ export function NotificationBell() {
   }
 
   useEffect(() => {
-    load();
+    const initialLoad = window.setTimeout(() => void load(), 0);
     const id = setInterval(load, 30_000);
-    return () => clearInterval(id);
+    return () => {
+      window.clearTimeout(initialLoad);
+      clearInterval(id);
+    };
   }, []);
 
   // Close on outside click
@@ -95,7 +100,7 @@ export function NotificationBell() {
                 key={n.id}
                 className={`px-4 py-3 text-sm flex gap-3 items-start cursor-pointer hover:bg-white/5 ${!n.read ? "bg-white/[0.03]" : ""}`}
                 onClick={() => {
-                  if (n.job_id) window.location.href = `/dashboard/jobs/${n.job_id}`;
+                  if (n.job_id) router.push(`/dashboard/jobs/${n.job_id}`);
                   setOpen(false);
                 }}
               >
