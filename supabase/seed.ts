@@ -7,9 +7,16 @@ dotenv.config();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const pilotPassword = process.env.PILOT_PASSWORD;
 
 if (!supabaseUrl || !serviceRoleKey) {
   throw new Error("Seed requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+}
+if (process.env.PILOT_SEED_CONFIRM !== "velocity-staging-pilot") {
+  throw new Error("Refusing to provision accounts. Set PILOT_SEED_CONFIRM=velocity-staging-pilot explicitly.");
+}
+if (!pilotPassword || pilotPassword.length < 16) {
+  throw new Error("PILOT_PASSWORD must be supplied and contain at least 16 characters.");
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -20,16 +27,16 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 const DEFAULT_TENANT_ID = "00000000-0000-4000-8000-000000000001";
 
 const demoUsers = [
-  { email: "superadmin@velocity.test", password: "velocity123", role: "admin", persona: "super_admin", fullName: "Sage Superadmin" },
-  { email: "tenantadmin@velocity.test", password: "velocity123", role: "admin", persona: "tenant_admin", fullName: "Tara Tenant Admin" },
-  { email: "dispatcher@velocity.test", password: "velocity123", role: "admin", persona: "dispatcher", fullName: "Devon Dispatcher" },
-  { email: "finance@velocity.test", password: "velocity123", role: "admin", persona: "finance_admin", fullName: "Finley Finance" },
-  { email: "providermanager@velocity.test", password: "velocity123", role: "admin", persona: "provider_manager", fullName: "Priya Provider Manager" },
-  { email: "provider@velocity.test", password: "velocity123", role: "provider", persona: "provider", fullName: "Parker Provider" },
-  { email: "customer@velocity.test", password: "velocity123", role: "customer", persona: "customer", fullName: "Casey Customer" },
-  { email: "support@velocity.test", password: "velocity123", role: "admin", persona: "support_agent", fullName: "Sam Support" },
-  { email: "auditor@velocity.test", password: "velocity123", role: "admin", persona: "auditor", fullName: "Ari Auditor" },
-  { email: "automation@velocity.test", password: "velocity123", role: "admin", persona: "automation_operator", fullName: "Avery Automation" },
+  { email: "superadmin@velocity.test", password: pilotPassword, role: "admin", persona: "super_admin", fullName: "Sage Superadmin" },
+  { email: "tenantadmin@velocity.test", password: pilotPassword, role: "admin", persona: "tenant_admin", fullName: "Tara Tenant Admin" },
+  { email: "dispatcher@velocity.test", password: pilotPassword, role: "admin", persona: "dispatcher", fullName: "Devon Dispatcher" },
+  { email: "finance@velocity.test", password: pilotPassword, role: "admin", persona: "finance_admin", fullName: "Finley Finance" },
+  { email: "providermanager@velocity.test", password: pilotPassword, role: "admin", persona: "provider_manager", fullName: "Priya Provider Manager" },
+  { email: "provider@velocity.test", password: pilotPassword, role: "provider", persona: "provider", fullName: "Parker Provider" },
+  { email: "customer@velocity.test", password: pilotPassword, role: "customer", persona: "customer", fullName: "Casey Customer" },
+  { email: "support@velocity.test", password: pilotPassword, role: "admin", persona: "support_agent", fullName: "Sam Support" },
+  { email: "auditor@velocity.test", password: pilotPassword, role: "admin", persona: "auditor", fullName: "Ari Auditor" },
+  { email: "automation@velocity.test", password: pilotPassword, role: "admin", persona: "automation_operator", fullName: "Avery Automation" },
 ] as const;
 
 const permissionObjects = [
@@ -50,6 +57,12 @@ async function upsertAuthUser(user: (typeof demoUsers)[number]) {
   const found = existing.users.find((item) => item.email === user.email);
 
   if (found) {
+    const { error: authError } = await supabase.auth.admin.updateUserById(found.id, {
+      password: user.password,
+      email_confirm: true,
+      user_metadata: { full_name: user.fullName },
+    });
+    if (authError) throw authError;
     await supabase.from("profiles").upsert({
       id: found.id,
       tenant_id: DEFAULT_TENANT_ID,

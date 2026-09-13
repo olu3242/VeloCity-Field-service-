@@ -1,0 +1,49 @@
+name: Certification
+
+on:
+  pull_request:
+  push:
+    branches: [main, feat/ai-native-job-outcome]
+  workflow_dispatch:
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm test
+      - run: npm run type-check
+      - run: npm run build
+
+  pilot-e2e:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npx playwright install --with-deps chromium
+      - run: npm run pilot:check
+        env: &pilot-env
+          PILOT_BASE_URL: ${{ vars.PILOT_BASE_URL }}
+          PILOT_CUSTOMER_EMAIL: ${{ vars.PILOT_CUSTOMER_EMAIL }}
+          PILOT_PROVIDER_EMAIL: ${{ vars.PILOT_PROVIDER_EMAIL }}
+          PILOT_ADMIN_EMAIL: ${{ vars.PILOT_ADMIN_EMAIL }}
+          PILOT_PASSWORD: ${{ secrets.PILOT_PASSWORD }}
+      - run: npm run test:e2e:pilot
+        env: *pilot-env
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

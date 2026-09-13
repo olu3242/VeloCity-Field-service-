@@ -10,6 +10,10 @@
     "type-check": "tsc --noEmit",
     "test": "npm run test:outcomes",
     "test:outcomes": "node --test --experimental-strip-types tests/job-outcome-contract.test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:pilot": "playwright test tests/e2e/pilot.spec.ts",
+    "pilot:check": "node scripts/pilot-readiness.mjs",
+    "pilot:provision": "PILOT_SEED_CONFIRM=velocity-staging-pilot npx tsx supabase/seed.ts",
     "db:seed": "npx tsx supabase/seed.ts",
     "db:reset": "npx supabase db reset && npm run db:seed",
     "agents:test": "npx tsx src/lib/agents/test-agents.ts"
@@ -50,6 +54,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "^22.10.7",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
